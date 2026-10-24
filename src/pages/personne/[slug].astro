@@ -75,13 +75,13 @@ const jsonLd = [
       <TitrePage texte={p.name} />
       <Reseaux liens={réseaux} />
       {projets.length > 0 && (
-        <Section nu>
+        <Section nu class="mt-12 md:mt-16 lg:mt-20">
           <Intitule texte={T.projets} />
           <TableauDates lignes={projets} />
         </Section>
       )}
       {p.bio && (
-        <Section nu>
+        <Section nu class="mt-12 md:mt-16 lg:mt-20">
           <Intitule texte={T.biographie} />
           <TexteRiche html={p.bio} justifie />
         </Section>
