@@ -42,10 +42,10 @@ const description = !debutBio
     : T.descriptionBio(p.name, extrait(p.bio, 155 - p.name.length - 2)!);
 
 const réseaux = [
-  { href: p.instagram, label: T.instagram },
-  { href: p.facebook, label: T.facebook },
-  { href: p.linkedin, label: T.linkedin },
-  { href: p.site, label: T.sitePerso },
+  { href: p.instagram, label: T.instagram, icone: 'instagram' as const },
+  { href: p.facebook, label: T.facebook, icone: 'facebook' as const },
+  { href: p.linkedin, label: T.linkedin, icone: 'linkedin' as const },
+  { href: p.site, label: T.sitePerso, icone: 'site' as const },
 ];
 
 // Pour les moteurs : la personne, et le chemin du lien retour.

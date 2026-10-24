@@ -1,0 +1,40 @@
+---
+// Le logo d'un réseau, en trait blanc (currentColor : il suit la couleur du
+// bouton, donc s'inverse au survol). Dessiné ici plutôt que chargé : le site
+// ne charge rien de tiers.
+interface Props {
+  nom: 'instagram' | 'facebook' | 'linkedin' | 'site';
+}
+
+const { nom } = Astro.props;
+---
+
+<svg class="size-4.5 tactile:size-5" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  {nom === 'instagram' && (
+    <g fill="none" stroke="currentColor" stroke-width="1.7">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r=".9" fill="currentColor" stroke="none" />
+    </g>
+  )}
+  {nom === 'facebook' && (
+    <path
+      fill="currentColor"
+      d="M13.5 21v-8h2.7l.4-3.2h-3.1V7.8c0-.9.3-1.5 1.6-1.5h1.7V3.2c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.4-4 4.100v2.700H7.700V13h2.700v8z"
+    />
+  )}
+  {nom === 'linkedin' && (
+    <g fill="currentColor">
+      <circle cx="6.5" cy="6.5" r="1.7" />
+      <rect x="5" y="10" width="3" height="9" />
+      <path d="M10.500 10h2.800v1.300c.5-.9 1.600-1.500 3-1.500 2.800 0 3.700 1.800 3.700 4.300V19h-3v-4.400c0-1.200-.3-2.200-1.600-2.200-1.400 0-1.900 1-1.900 2.300V19h-3z" />
+    </g>
+  )}
+  {nom === 'site' && (
+    <g fill="none" stroke="currentColor" stroke-width="1.7">
+      <circle cx="12" cy="12" r="9" />
+      <ellipse cx="12" cy="12" rx="4" ry="9" />
+      <path d="M3 12h18" />
+    </g>
+  )}
+</svg>
