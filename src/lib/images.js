@@ -21,6 +21,28 @@ import { getImage } from 'astro:assets';
  */
 
 /**
+ * Les largeurs à fabriquer, jamais au-dessus de l'original, et la plus grande (`width`, le repli).
+ * @param {Taille|null|undefined} taille
+ * @param {number[]} largeurs
+ */
+function largeursRetenues(taille, largeurs) {
+  const max = taille?.width ?? Math.max(...largeurs);
+  const retenues = largeurs.filter((l) => l < max);
+  const width = Math.min(max, Math.max(...largeurs));
+  if (!retenues.includes(width)) retenues.push(width);
+  return { width, retenues };
+}
+
+/**
+ * La hauteur à `width` de large, à la proportion de l'original ; null si on ne la connaît pas.
+ * @param {Taille|null|undefined} taille
+ * @param {number} width
+ */
+function hauteurPour(taille, width) {
+  return taille?.width && taille?.height ? Math.round((taille.height / taille.width) * width) : null;
+}
+
+/**
  * Une image en plusieurs largeurs, jamais au-dessus de l'original : ce qu'un
  * `<img srcset sizes>` attend, avec les dimensions qui réservent sa place.
  * Avec `avif`, les mêmes largeurs aussi en AVIF, pour une `<source>`.
@@ -31,14 +53,11 @@ import { getImage } from 'astro:assets';
  * @returns {Promise<Réactive>}
  */
 async function réactive(image, taille, { largeurs, sizes, qualité = 78, avif = false }) {
-  const max = taille?.width ?? Math.max(...largeurs);
-  const retenues = largeurs.filter((l) => l < max);
-  const width = Math.min(max, Math.max(...largeurs));
-  if (!retenues.includes(width)) retenues.push(width);
+  const { width, retenues } = largeursRetenues(taille, largeurs);
   const options = { src: image, width, widths: retenues, sizes };
   const img = await getImage({ ...options, format: 'webp', quality: qualité });
   const enAvif = avif ? await getImage({ ...options, format: 'avif', quality: QUALITÉ_AVIF }) : null;
-  const height = taille?.width && taille?.height ? Math.round((taille.height / taille.width) * width) : Number(img.attributes.height) || width;
+  const height = hauteurPour(taille, width) ?? (Number(img.attributes.height) || width);
   return { src: img.src, srcset: img.srcSet.attribute, sizes, width, height, avif: enAvif?.srcSet.attribute ?? null, portrait: null, apercu: null };
 }
 
