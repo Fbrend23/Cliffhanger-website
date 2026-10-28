@@ -51,7 +51,7 @@ const { img, alt, style, titre, sous = null, credit = null, sansTraduction = fal
       aria-hidden="true"
     ></span>
   </button>
-  <hgroup class="absolute bottom-0 left-0 z-2 max-w-full p-4 pr-10 opacity-75 lg:pr-24">
+  <hgroup class="pointer-events-none absolute bottom-0 left-0 z-2 max-w-full p-4 pr-10 opacity-75 lg:pr-24">
     <h1 class="titre text-titre" data-cascade translate={sansTraduction ? 'no' : undefined} set:html={tx(titre)} />
     {sous != null && sous !== '' && <p class="mt-1 text-sous-titre" data-cascade set:html={tx(sous)} />}
   </hgroup>
