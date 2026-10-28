@@ -11,8 +11,8 @@ Type : Site statique. Générée le 23.10.2026.
 
 ## 2. Git et conventions (02)
 - [x] `.gitignore` : `.env`, `node_modules`, `dist`
-- [ ] Branches `dev` / `main` (ou gitflow), `main` protégée si équipe
-- [ ] Commits conventionnels, corps = pourquoi
+- [x] Branches `dev` / `main` (ou gitflow), `main` protégée si équipe
+- [x] Commits conventionnels, corps = pourquoi
 - [x] `.editorconfig`, Prettier, ESLint, scripts `lint` et `format`
 - [x] Fichier de contexte IA (modèle : `templates/AGENTS.md`)
 
@@ -25,8 +25,8 @@ Type : Site statique. Générée le 23.10.2026.
 - [x] Secrets de CI dans GitHub, plan de rotation noté
 
 ## 4. Sécurité de l'app (04)
-- [ ] Aucune sortie HTML brute non maîtrisée, JSON-LD et `<script>` échappés
-- [ ] URLs externes et redirections filtrées
+- [x] Aucune sortie HTML brute non maîtrisée, JSON-LD et `<script>` échappés
+- [x] URLs externes et redirections filtrées
 - [x] En-têtes de sécurité, CSP présente ou absence justifiée par écrit
 - [ ] securityheaders.com et observatory.mozilla.org sans alerte
 
