@@ -71,7 +71,7 @@ Type : Site statique. Générée le 23.10.2026.
 
 ## 10. Accessibilité (10)
 - [x] `lang`, un seul `<h1>`, lien d'évitement
-- [ ] Tout au clavier, focus visible, piège de focus et `Échap` dans les fenêtres
+- [x] Tout au clavier, focus visible, piège de focus et `Échap` dans les fenêtres
 - [x] `aria-expanded` / `aria-current` / `aria-pressed` / `aria-live` bien posés
 - [x] `prefers-reduced-motion` géré (CSS et JS)
 - [x] Fonctionne sans JavaScript
