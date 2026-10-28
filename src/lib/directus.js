@@ -43,7 +43,17 @@ export const MANIFEST_REL = `${CACHE_REL}/manifest.json`;
  * dont le site n'a pas l'usage (platform-cms, scripts/lib/permissions.mjs).
  * En demander un qui n'y est pas fait échouer la requête.
  */
-export const CHAMPS_FICHIER = ['id', 'filename_download', 'type', 'width', 'height', 'modified_on', 'title', 'focal_point_x', 'focal_point_y'];
+export const CHAMPS_FICHIER = [
+  'id',
+  'filename_download',
+  'type',
+  'width',
+  'height',
+  'modified_on',
+  'title',
+  'focal_point_x',
+  'focal_point_y',
+];
 
 /**
  * `hero.id,hero.type,…` : les mêmes champs, préfixés pour une relation.
@@ -58,8 +68,10 @@ export const champsFichier = (relation) => CHAMPS_FICHIER.map((c) => `${relation
 // Un 5xx ou une coupure réseau (fréquents sur un hébergement mutualisé) se
 // rejouent aussi, deux fois, et une connexion figée s'arrête au bout de 30 s :
 // sans délai, elle tiendrait le déploiement de nuit jusqu'aux 20 min du job.
+// Le délai court l'échange entier, corps compris : un original de 15 Mo sur une
+// liaison lente ne tient pas en 30 s, d'où `fichier` pour les téléchargements.
 // Un objet exporté, pour que les tests réduisent les attentes.
-export const DÉLAIS = { panne: [2000, 5000], max: 30_000 };
+export const DÉLAIS = { panne: [2000, 5000], max: 30_000, fichier: 120_000 };
 
 /** @param {number} ms */
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -68,17 +80,18 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
  * @param {string} url
  * @param {number} [tentative]  rejeux faits après un 429
  * @param {number} [pannes]     rejeux faits après un 5xx ou une coupure
+ * @param {number} [délai]      durée maximale de l'échange, corps compris
  * @returns {Promise<Response>}
  */
-async function appeler(url, tentative = 0, pannes = 0) {
+async function appeler(url, tentative = 0, pannes = 0, délai = DÉLAIS.max) {
   const adresse = url.replace(DIRECTUS_URL, '');
   let res;
   try {
-    res = await fetch(url, { headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` }, signal: AbortSignal.timeout(DÉLAIS.max) });
+    res = await fetch(url, { headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` }, signal: AbortSignal.timeout(délai) });
   } catch (e) {
     if (pannes < DÉLAIS.panne.length) {
       await attendre(DÉLAIS.panne[pannes]);
-      return appeler(url, tentative, pannes + 1);
+      return appeler(url, tentative, pannes + 1, délai);
     }
     throw new Error(`CMS injoignable (${adresse}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
   }
@@ -86,12 +99,12 @@ async function appeler(url, tentative = 0, pannes = 0) {
   if (res.status === 429 && tentative < 5) {
     const secondes = Number(res.headers.get('retry-after')) || 1;
     await attendre(secondes * 1000 + 50);
-    return appeler(url, tentative + 1, pannes);
+    return appeler(url, tentative + 1, pannes, délai);
   }
 
   if (res.status >= 500 && pannes < DÉLAIS.panne.length) {
     await attendre(DÉLAIS.panne[pannes]);
-    return appeler(url, tentative, pannes + 1);
+    return appeler(url, tentative, pannes + 1, délai);
   }
 
   if (!res.ok) {
@@ -142,7 +155,11 @@ export async function requestAll(chemin) {
 // --- Le cache des originaux --------------------------------------------------
 
 /** @param {string} chemin */
-const existe = (chemin) => access(chemin).then(() => true, () => false);
+const existe = (chemin) =>
+  access(chemin).then(
+    () => true,
+    () => false
+  );
 
 /** @typedef {{ modified_on: string, fichier: string, aperçu?: string, portrait?: { focal: string, fichier: string } }} Entrée */
 /** @typedef {{ dossier: string, manifest: Record<string, Entrée>, enregistrer(): Promise<void> }} Cache */
@@ -244,14 +261,10 @@ export async function purgerCache(cache, garder) {
  * @param {{ info(msg:string):void }} logger
  */
 export async function assurerFichier(fichier, cache, logger) {
-  const ext = (
-    path.extname(fichier.filename_download ?? '').slice(1) ||
-    fichier.type?.split('/')[1] ||
-    'jpg'
-  ).toLowerCase();
+  const ext = (path.extname(fichier.filename_download ?? '').slice(1) || fichier.type?.split('/')[1] || 'jpg').toLowerCase();
   const nom = `${fichier.id}.${ext}`;
   await ranger(cache, fichier.id, nom, fichier.modified_on ?? '', logger, fichier.filename_download ?? fichier.id, () =>
-    appeler(`${DIRECTUS_URL}/assets/${fichier.id}`)
+    appeler(`${DIRECTUS_URL}/assets/${fichier.id}`, 0, 0, DÉLAIS.fichier)
   );
   return `./${nom}`;
 }
@@ -455,7 +468,10 @@ export async function assurerPortrait(id, focal, cache, logger) {
       const méta = await original.metadata();
       const { width: W, height: H } = méta.autoOrient ?? méta;
       const tmp = `${cible}.part`;
-      await original.extract(cadrePortrait(W, H, focal)).webp({ quality: 92 }).toFile(tmp);
+      await original
+        .extract(cadrePortrait(W, H, focal))
+        .webp({ quality: 92 })
+        .toFile(tmp);
       await rename(tmp, cible);
       entrée.portrait = { focal: clé, fichier: nom };
     })().finally(() => enCours.delete(tâche));
