@@ -22,7 +22,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [x] `.env.example` commenté et commité, `.env` ignoré
 - [x] Validation des variables au démarrage ou au build · `astro:env` (`astro.config.mjs`), étape « Refuser un build sans ses sources » en CI
 - [x] Aucun secret dans le bundle client · `DIRECTUS_TOKEN` en `access: 'secret'` ; la clé Prodysos est une clé publiable, voulue dans les pages
-- [~] Jetons séparés, moindre privilège, aucun jeton admin dans la CI · jeton `dev+cliff` en lecture seule du contenu publié ; la CI écrit seulement `cliff_publication` ; `FTP_PASSWORD` donne un accès complet au compte
+- [x] Jetons séparés, moindre privilège, aucun jeton admin dans la CI · policy de build en lecture du contenu publié, plus l'écriture des seuls champs de `cliff_publication` (`platform-cms/scripts/lib/permissions.mjs`) ; aucun jeton admin en CI (le mot de passe FTP donne l'accès au compte d'hébergement, hors périmètre)
 - [x] Gitleaks dans le hook de pré-commit · `.githooks/pre-commit` (gitleaks ou Docker), activé par `npm install`
 - [x] Secrets de CI dans GitHub, plan de rotation noté · tableau « Secrets » du README, rotation annuelle
 
@@ -45,7 +45,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [ ] Scan ZAP et injections manuelles passés · non fait
 
 ## 7. Tests (07)
-- [~] `npm test` fonctionne sur un clone neuf · « fonctions pures, loaders : sans CMS » (README) ; à confirmer sur un clone neuf
+- [x] `npm test` fonctionne sur un clone neuf · `deploy.yml` lance `npm ci` puis `npm test` sur un checkout vierge à chaque déploiement (dernier : 28.10.2026, succès)
 - [x] Unitaires sur logique métier et fonctions de sécurité · dates, générique, typographie, SEO, Prodysos, loaders, légal, déploiement (`test/*.test.js`)
 - [ ] E2E Playwright sur les parcours critiques · absent
 - [ ] Captures Playwright (`toHaveScreenshot`) sur accueil et formulaire · absent (captures faites à la main en CDP)
@@ -65,7 +65,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 
 ## 9. Performance (09)
 - [x] Images AVIF/WebP, dimensions explicites, image principale préchargée · `src/lib/images.js`, `Photo.astro`, préchargement AVIF dans `Base.astro`
-- [~] `dist/` sans originaux en trop, SVG passés par `svgo` · loader des photos limité à ce qui est rendu (CLAUDE.md) ; aucun SVG dans le dépôt, `svgo` sans objet
+- [x] `dist/` sans originaux en trop, SVG passés par `svgo` · `dist/` (32 Mo) ne contient que des WebP, AVIF et quelques JPEG d'aperçu (Open Graph), plus la vidéo du menu ; aucun SVG, `svgo` sans objet
 - [x] Polices auto-hébergées, préchargées, police de secours ajustée (`size-adjust`) · `woff2` préchargées, `font-display: swap`, polices de secours ajustées (`size-adjust`, `site.css`)
 - [x] `Cache-Control` par type de ressource, compression · `.htaccess` (immutable un an, une semaine, `no-cache` pour le HTML) ; compression laissée à l'hébergeur, non vérifiée
 - [x] Pas de JS inutile, `console.*` retirés · aucun framework client ; un seul `console.warn` (build, `prodysos.js`)
@@ -86,7 +86,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 ## 11. SEO (11)
 - [x] Contenu présent dans le HTML sans JavaScript · site statique
 - [x] `title` et `description` uniques, un seul `<h1>` · vérifié par `test:dist`
-- [~] Canonical, hreflang + `x-default` · canonical testé ; hreflang sans objet tant que le site est monolingue (version anglaise au « Reste à faire »)
+- [x] Canonical, hreflang + `x-default` · canonical testé dans `test:dist` ; hreflang et `x-default` sans objet tant que le site est monolingue (version anglaise au « Reste à faire »)
 - [x] Open Graph et Twitter complets · Open Graph et `twitter:title/description/image/card`
 - [x] JSON-LD valide, échappé, testé · `seo.js`, `Base.astro`, test `dist`
 - [x] `sitemap.xml` et `robots.txt` (généré depuis `SITE_URL`) · `@astrojs/sitemap` et `robots.txt.js`

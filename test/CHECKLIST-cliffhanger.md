@@ -20,7 +20,7 @@ Type : Site statique. Générée le 23.10.2026.
 - [x] `.env.example` commenté et commité, `.env` ignoré
 - [x] Validation des variables au démarrage ou au build
 - [x] Aucun secret dans le bundle client
-- [ ] Jetons séparés, moindre privilège, aucun jeton admin dans la CI
+- [x] Jetons séparés, moindre privilège, aucun jeton admin dans la CI
 - [x] Gitleaks dans le hook de pré-commit
 - [x] Secrets de CI dans GitHub, plan de rotation noté
 
@@ -43,7 +43,7 @@ Type : Site statique. Générée le 23.10.2026.
 - [ ] Scan ZAP et injections manuelles passés
 
 ## 7. Tests (07)
-- [ ] `npm test` fonctionne sur un clone neuf
+- [x] `npm test` fonctionne sur un clone neuf
 - [x] Unitaires sur logique métier et fonctions de sécurité
 - [ ] E2E Playwright sur les parcours critiques
 - [ ] Captures Playwright (`toHaveScreenshot`) sur accueil et formulaire
@@ -63,7 +63,7 @@ Type : Site statique. Générée le 23.10.2026.
 
 ## 9. Performance (09)
 - [x] Images AVIF/WebP, dimensions explicites, image principale préchargée
-- [ ] `dist/` sans originaux en trop, SVG passés par `svgo`
+- [x] `dist/` sans originaux en trop, SVG passés par `svgo`
 - [x] Polices auto-hébergées, préchargées, police de secours ajustée (`size-adjust`)
 - [x] `Cache-Control` par type de ressource, compression
 - [x] Pas de JS inutile, `console.*` retirés
@@ -84,7 +84,7 @@ Type : Site statique. Générée le 23.10.2026.
 ## 11. SEO (11)
 - [x] Contenu présent dans le HTML sans JavaScript
 - [x] `title` et `description` uniques, un seul `<h1>`
-- [ ] Canonical, hreflang + `x-default`
+- [x] Canonical, hreflang + `x-default`
 - [x] Open Graph et Twitter complets
 - [x] JSON-LD valide, échappé, testé
 - [x] `sitemap.xml` et `robots.txt` (généré depuis `SITE_URL`)
