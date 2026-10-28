@@ -15,6 +15,7 @@
 // réservation (voir réserver) : ce module n'importe donc rien de Node. Même
 // connecteur que Maisallezfieu.
 
+import { messageDe } from './erreurs.js';
 import { échapper } from './typo.js';
 
 /** @typedef {{ PRODYSOS_URL: string, PRODYSOS_KEY: string, PRODYSOS_COMPANY: string }} EnvProdysos */
@@ -55,8 +56,8 @@ async function rpc(env, { fonction, corps }, délais = DÉLAIS) {
       });
     } catch (e) {
       // Une erreur réseau est aussi passagère qu'un 5xx : mêmes essais.
-      if (essai >= délais.length) throw new Error(`Prodysos injoignable (${fonction}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
-      await attendre(délais[essai], fonction, e instanceof Error ? e.message : String(e));
+      if (essai >= délais.length) throw new Error(`Prodysos injoignable (${fonction}) : ${messageDe(e)}`, { cause: e });
+      await attendre(délais[essai], fonction, messageDe(e));
       continue;
     }
     if (res.ok) return res.json();

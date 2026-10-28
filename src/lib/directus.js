@@ -23,6 +23,7 @@ import { access, mkdir, readFile, readdir, rename, unlink, writeFile } from 'nod
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { messageDe } from './erreurs.js';
 
 /**
  * Le dossier du cache, RELATIF à la racine du projet et en séparateurs posix :
@@ -106,7 +107,7 @@ async function appeler(url, délai = DÉLAIS.max) {
     try {
       res = await fetch(url, { headers, signal: AbortSignal.timeout(délai) });
     } catch (e) {
-      if (pannes >= DÉLAIS.panne.length) throw new Error(`CMS injoignable (${adresse}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+      if (pannes >= DÉLAIS.panne.length) throw new Error(`CMS injoignable (${adresse}) : ${messageDe(e)}`, { cause: e });
       await attendre(DÉLAIS.panne[pannes++]);
       continue;
     }
@@ -319,7 +320,7 @@ export async function assurerFichierExterne(url, id, { cache, logger }) {
     try {
       res = await fetch(url);
     } catch (e) {
-      throw new Error(`Image injoignable (${url}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+      throw new Error(`Image injoignable (${url}) : ${messageDe(e)}`, { cause: e });
     }
     if (!res.ok) throw new Error(`Image ${url} : HTTP ${res.status}`);
     return res;
