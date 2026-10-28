@@ -295,6 +295,8 @@ const entrée =
       // `approche` : la main est sur le bouton, la vidéo part quelle que soit la connexion. Au repos,
       // elle ne part que sur une connexion rapide connue (4g) : les autres ne paient pas cinq mégaoctets
       // pour un menu qu'elles n'ouvriront peut-être pas.
+      // Avec l'économiseur de données ou le mouvement réduit, l'image fixe suffit : rien d'avance.
+      const sobre = () => mouvementRéduit.matches || connexion()?.saveData === true;
       function préparerMenu(approche = true) {
         const m = menu();
         const vidéo = document.getElementById('menuVideo') as HTMLVideoElement | null;
@@ -307,8 +309,7 @@ const entrée =
           vidéo.poster = vidéo.dataset.poster;
           delete vidéo.dataset.poster;
         }
-        // Avec l'économiseur de données ou le mouvement réduit, l'image fixe suffit : rien d'avance.
-        const permis = !mouvementRéduit.matches && connexion()?.saveData !== true && (approche || connexion()?.effectiveType === '4g');
+        const permis = !sobre() && (approche || connexion()?.effectiveType === '4g');
         if (permis && vidéo.preload !== 'auto') vidéo.preload = 'auto';
       }
       const auRepos = (f: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(f) : setTimeout(f, 1000));
@@ -331,7 +332,7 @@ const entrée =
         if (ouvert) {
           // Filet : tout part déjà au repos, ceci ne sert qu'à un clic avant la fin du chargement.
           préparerMenu();
-          if (!mouvementRéduit.matches && connexion()?.saveData !== true) vidéo.play().catch(() => {});
+          if (!sobre()) vidéo.play().catch(() => {});
           m.querySelector('a')?.focus({ preventScroll: true });
         } else {
           setTimeout(() => {
@@ -356,6 +357,20 @@ const entrée =
         }
       });
 
+      // Tab boucle sur les éléments du menu : du dernier on revient au premier, et inversement.
+      function garderFocusDansMenu(e: KeyboardEvent) {
+        const cibles = [burger(), ...(menu()?.querySelectorAll('a') ?? [])].filter((n): n is HTMLElement => !!n && n.getClientRects().length > 0);
+        const premier = cibles[0];
+        const dernier = cibles[cibles.length - 1];
+        if (e.shiftKey && document.activeElement === premier) {
+          e.preventDefault();
+          dernier?.focus();
+        } else if (!e.shiftKey && document.activeElement === dernier) {
+          e.preventDefault();
+          premier?.focus();
+        }
+      }
+
       // Tab reste dans le menu ouvert ; Échap le ferme.
       document.addEventListener('keydown', (e) => {
         if (!menuOuvert()) return;
@@ -363,16 +378,7 @@ const entrée =
           ouvrirMenu(false);
           burger()?.focus();
         } else if (e.key === 'Tab') {
-          const cibles = [burger(), ...(menu()?.querySelectorAll('a') ?? [])].filter((n): n is HTMLElement => !!n && n.getClientRects().length > 0);
-          const premier = cibles[0];
-          const dernier = cibles[cibles.length - 1];
-          if (e.shiftKey && document.activeElement === premier) {
-            e.preventDefault();
-            dernier?.focus();
-          } else if (!e.shiftKey && document.activeElement === dernier) {
-            e.preventDefault();
-            premier?.focus();
-          }
+          garderFocusDansMenu(e);
         }
       });
 
@@ -401,11 +407,16 @@ const entrée =
       const frais = (e?: Entrée): e is Entrée => !!e && Date.now() - e.quand < duréePage;
 
       // Un lien vers une autre page du site, en adresse finale (barre oblique : sans elle, Apache redirige).
+      const pageDuSite = (l: HTMLAnchorElement) =>
+        l.origin === location.origin &&
+        !l.target &&
+        !l.hasAttribute('download') &&
+        !l.hasAttribute('data-astro-reload') &&
+        l.pathname.endsWith('/') &&
+        !(l.pathname === location.pathname && l.search === location.search);
       function lienInterne(cible: Element | null) {
         const l = cible?.closest?.('a[href]') as HTMLAnchorElement | null | undefined;
-        if (!l || l.origin !== location.origin || l.target || l.hasAttribute('download') || l.hasAttribute('data-astro-reload')) return null;
-        if (!l.pathname.endsWith('/') || (l.pathname === location.pathname && l.search === location.search)) return null;
-        return l;
+        return l && pageDuSite(l) ? l : null;
       }
 
       function précharger(l: HTMLAnchorElement) {

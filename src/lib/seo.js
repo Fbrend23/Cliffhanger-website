@@ -171,7 +171,7 @@ function fin(spectacle, r, début) {
   const minutes = r.time ? duréeEnMinutes(spectacle.duration) : null;
   if (!minutes) return null;
   const finale = jourEtHeure(Date.parse(début) + minutes * 60_000);
-  return instantBruxelles(finale.day, finale.time);
+  return finale ? instantBruxelles(finale.day, finale.time) : null;
 }
 
 /**

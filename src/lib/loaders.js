@@ -329,7 +329,7 @@ function photosServies(spectacles, réglages) {
 
 /**
  * Ce que le cache doit garder : tout fichier encore affiché.
- * @param {{ photos: any[], servies: Set<string>, autres: any[], réglages: any, prodysos: { shows?: any[] } }} lecture
+ * @param {{ photos: any[], servies: Set<string>, autres: any[], réglages: any, prodysos: { shows?: any[] | null } }} lecture
  */
 function fichiersÀGarder({ photos, servies, autres, réglages, prodysos }) {
   /** @param {unknown[]} ids */
