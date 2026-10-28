@@ -174,6 +174,44 @@ export function titreNormalisé(titre) {
 }
 
 /**
+ * Les liens posés à la main (`prodysos_slug`), et les spectacles du CMS qui n'en ont pas.
+ * @template {{ slug: string, prodysos_slug?: string|null, price?: string|null }} S
+ * @param {S[]} spectaclesCms
+ */
+function liensForcés(spectaclesCms) {
+  /** @type {Map<string, { slug: string, price: string|null }>} */
+  const liens = new Map();
+  /** @type {S[]} */
+  const libres = [];
+  for (const s of spectaclesCms) {
+    const clé = texteOuNull(s.prodysos_slug);
+    if (!clé) {
+      libres.push(s);
+      continue;
+    }
+    const déjà = liens.get(clé);
+    if (déjà) throw new Error(`Deux spectacles publiés réclament le spectacle Prodysos « ${clé} » : ${déjà.slug} et ${s.slug}.`);
+    liens.set(clé, { slug: s.slug, price: texteOuNull(s.price) });
+  }
+  return { liens, libres };
+}
+
+/**
+ * Les spectacles du CMS par titre normalisé ; un titre vide n'en indexe aucun.
+ * @template {{ title?: string|null }} S
+ * @param {S[]} spectacles
+ */
+function indexerParTitre(spectacles) {
+  /** @type {Map<string, S[]>} */
+  const parTitre = new Map();
+  for (const s of spectacles) {
+    const titre = titreNormalisé(s.title);
+    if (titre) parTitre.set(titre, [...(parTitre.get(titre) ?? []), s]);
+  }
+  return parTitre;
+}
+
+/**
  * Quel spectacle du CMS reçoit les dates de quel spectacle Prodysos.
  *
  * 1. Le `prodysos_slug` saisi dans le CMS : le lien forcé, pour des titres qui
@@ -194,27 +232,8 @@ export function titreNormalisé(titre) {
  * @returns {Map<string, { slug: string, price: string|null }>}  slug Prodysos → spectacle du CMS
  */
 export function relier(spectaclesProdysos, spectaclesCms, { avertir, informer = () => {} }) {
-  const liens = new Map();
-  /** @type {typeof spectaclesCms} */
-  const libres = [];
-  for (const s of spectaclesCms) {
-    const clé = texteOuNull(s.prodysos_slug);
-    if (!clé) {
-      libres.push(s);
-      continue;
-    }
-    if (liens.has(clé)) {
-      throw new Error(`Deux spectacles publiés réclament le spectacle Prodysos « ${clé} » : ${liens.get(clé).slug} et ${s.slug}.`);
-    }
-    liens.set(clé, { slug: s.slug, price: texteOuNull(s.price) });
-  }
-
-  /** @type {Map<string, typeof spectaclesCms>} */
-  const parTitre = new Map();
-  for (const s of libres) {
-    const titre = titreNormalisé(s.title);
-    if (titre) parTitre.set(titre, [...(parTitre.get(titre) ?? []), s]);
-  }
+  const { liens, libres } = liensForcés(spectaclesCms);
+  const parTitre = indexerParTitre(libres);
   for (const show of spectaclesProdysos) {
     if (!show?.slug || liens.has(show.slug)) continue;
     const candidats = parTitre.get(titreNormalisé(show.title)) ?? [];
@@ -242,38 +261,61 @@ export function lignesProdysos(spectaclesProdysos, parSlugProdysos, avertir) {
   const lignes = [];
   for (const show of spectaclesProdysos) {
     const cible = parSlugProdysos.get(show?.slug);
-    const représentations = Array.isArray(show?.representations) ? show.representations : [];
+    const représentations = représentationsDe(show);
     if (!cible) {
-      if (représentations.length) avertir(`Prodysos « ${show?.slug} » (« ${show?.title} ») : aucun spectacle publié de ce titre ni qui le réclame (prodysos_slug), ${représentations.length} date(s) ignorée(s)`);
+      signalerIgnoré(show, représentations, avertir);
       continue;
     }
     for (const r of représentations) {
-      const quand = jourEtHeure(r?.date);
-      if (!quand) {
-        avertir(`Prodysos « ${show.slug} » : représentation ${r?.id} sans date lisible, ignorée`);
-        continue;
-      }
-      const venue = texteOuNull(r.location_name);
-      const lieu = adresse(r.location_address);
-      const city = lieu?.city ?? null;
-      if (r.location_address && !city) avertir(`Prodysos « ${show.slug} » : commune introuvable dans « ${r.location_address} », la salle s’affiche seule`);
-      // De quoi réserver cette date : le spectacle Prodysos (sa page publique)
-      // et la représentation, ce qu'attend create_public_reservation.
-      const reservation = { slug: show.slug, id: String(r.id) };
-      lignes.push({
-        id: `prodysos-${r.id}`,
-        spectacle: cible.slug,
-        ...quand,
-        venue,
-        city,
-        street: lieu?.street ?? null,
-        postalCode: lieu?.postalCode ?? null,
-        price: cible.price,
-        reservation,
-      });
+      const ligne = ligneProdysos(r, { slug: show.slug, cible, avertir });
+      if (ligne) lignes.push(ligne);
     }
   }
   return lignes;
+}
+
+/** @param {any} show */
+const représentationsDe = (show) => (Array.isArray(show?.representations) ? show.representations : []);
+
+/**
+ * Un spectacle Prodysos que rien ne relie au CMS : ses dates sont ignorées, et on le dit
+ * s'il en avait.
+ * @param {any} show
+ * @param {any[]} représentations
+ * @param {(message: string) => void} avertir
+ */
+function signalerIgnoré(show, représentations, avertir) {
+  if (!représentations.length) return;
+  avertir(`Prodysos « ${show?.slug} » (« ${show?.title} ») : aucun spectacle publié de ce titre ni qui le réclame (prodysos_slug), ${représentations.length} date(s) ignorée(s)`);
+}
+
+const SANS_ADRESSE = { street: null, postalCode: null, city: null };
+
+/**
+ * Une représentation Prodysos en ligne du CMS, ou null si elle n'a pas de date lisible.
+ * @param {any} r
+ * @param {{ slug: string, cible: { slug: string, price: string|null }, avertir: (message: string) => void }} contexte
+ *   `slug` : le spectacle Prodysos ; `cible` : le spectacle du CMS relié
+ */
+function ligneProdysos(r, { slug, cible, avertir }) {
+  const quand = jourEtHeure(r?.date);
+  if (!quand) {
+    avertir(`Prodysos « ${slug} » : représentation ${r?.id} sans date lisible, ignorée`);
+    return null;
+  }
+  const lieu = adresse(r.location_address) ?? SANS_ADRESSE;
+  if (r.location_address && !lieu.city) avertir(`Prodysos « ${slug} » : commune introuvable dans « ${r.location_address} », la salle s’affiche seule`);
+  return {
+    id: `prodysos-${r.id}`,
+    spectacle: cible.slug,
+    ...quand,
+    venue: texteOuNull(r.location_name),
+    ...lieu,
+    price: cible.price,
+    // De quoi réserver cette date : le spectacle Prodysos (sa page publique)
+    // et la représentation, ce qu'attend create_public_reservation.
+    reservation: { slug, id: String(r.id) },
+  };
 }
 
 /** @param {unknown} v */
