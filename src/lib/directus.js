@@ -77,42 +77,51 @@ export const DÉLAIS = { panne: [2000, 5000], max: 30_000, fichier: 120_000 };
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Que faire d'une réponse : la rendre (`ok`), attendre ce que demande le serveur (`limite`),
+ * rejouer après une panne (`panne`), ou renoncer (`refus`).
+ * @param {Response} res
+ * @param {number} limites  rejeux faits après un 429
+ * @param {number} pannes   rejeux faits après un 5xx ou une coupure
+ * @returns {'ok' | 'limite' | 'panne' | 'refus'}
+ */
+function verdict(res, limites, pannes) {
+  if (res.status === 429 && limites < 5) return 'limite';
+  if (res.status >= 500 && pannes < DÉLAIS.panne.length) return 'panne';
+  return res.ok ? 'ok' : 'refus';
+}
+
+/**
  * @param {string} url
- * @param {number} [tentative]  rejeux faits après un 429
- * @param {number} [pannes]     rejeux faits après un 5xx ou une coupure
- * @param {number} [délai]      durée maximale de l'échange, corps compris
+ * @param {{ délai?: number }} [options]  `délai` : durée maximale de l'échange, corps compris
  * @returns {Promise<Response>}
  */
-async function appeler(url, tentative = 0, pannes = 0, délai = DÉLAIS.max) {
+async function appeler(url, options) {
   const adresse = url.replace(DIRECTUS_URL, '');
-  let res;
-  try {
-    res = await fetch(url, { headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` }, signal: AbortSignal.timeout(délai) });
-  } catch (e) {
-    if (pannes < DÉLAIS.panne.length) {
-      await attendre(DÉLAIS.panne[pannes]);
-      return appeler(url, tentative, pannes + 1, délai);
+  const délai = options?.délai ?? DÉLAIS.max;
+  const headers = { Authorization: `Bearer ${DIRECTUS_TOKEN}` };
+  let limites = 0;
+  let pannes = 0;
+
+  for (;;) {
+    let res;
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(délai) });
+    } catch (e) {
+      if (pannes >= DÉLAIS.panne.length) throw new Error(`CMS injoignable (${adresse}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+      await attendre(DÉLAIS.panne[pannes++]);
+      continue;
     }
-    throw new Error(`CMS injoignable (${adresse}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
-  }
 
-  if (res.status === 429 && tentative < 5) {
-    const secondes = Number(res.headers.get('retry-after')) || 1;
-    await attendre(secondes * 1000 + 50);
-    return appeler(url, tentative + 1, pannes, délai);
+    const suite = verdict(res, limites, pannes);
+    if (suite === 'ok') return res;
+    if (suite === 'refus') throw new Error(`CMS ${adresse} : HTTP ${res.status} ${await res.text().catch(() => '')}`.trim());
+    if (suite === 'limite') {
+      limites++;
+      await attendre((Number(res.headers.get('retry-after')) || 1) * 1000 + 50);
+    } else {
+      await attendre(DÉLAIS.panne[pannes++]);
+    }
   }
-
-  if (res.status >= 500 && pannes < DÉLAIS.panne.length) {
-    await attendre(DÉLAIS.panne[pannes]);
-    return appeler(url, tentative, pannes + 1, délai);
-  }
-
-  if (!res.ok) {
-    const détail = await res.text().catch(() => '');
-    throw new Error(`CMS ${adresse} : HTTP ${res.status} ${détail}`.trim());
-  }
-
-  return res;
 }
 
 /**
@@ -264,7 +273,7 @@ export async function assurerFichier(fichier, cache, logger) {
   const ext = (path.extname(fichier.filename_download ?? '').slice(1) || fichier.type?.split('/')[1] || 'jpg').toLowerCase();
   const nom = `${fichier.id}.${ext}`;
   await ranger(cache, fichier.id, nom, fichier.modified_on ?? '', logger, fichier.filename_download ?? fichier.id, () =>
-    appeler(`${DIRECTUS_URL}/assets/${fichier.id}`, 0, 0, DÉLAIS.fichier)
+    appeler(`${DIRECTUS_URL}/assets/${fichier.id}`, { délai: DÉLAIS.fichier })
   );
   return `./${nom}`;
 }
