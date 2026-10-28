@@ -39,11 +39,10 @@ const DÉLAIS = [2000, 5000];
 
 /**
  * @param {EnvProdysos} env
- * @param {string} fonction
- * @param {unknown} corps
+ * @param {{ fonction: string, corps: unknown }} appel
  * @param {number[]} [délais]
  */
-async function rpc(env, fonction, corps, délais = DÉLAIS) {
+async function rpc(env, { fonction, corps }, délais = DÉLAIS) {
   for (let essai = 0; ; essai++) {
     let res;
     try {
@@ -98,7 +97,7 @@ async function décrireErreur(res) {
  * @param {{ délais?: number[] }} [options]  les attentes entre les essais (les tests les raccourcissent)
  */
 export async function lireSpectaclesProdysos(env, { délais } = {}) {
-  const data = await rpc(env, 'get_public_company_shows', { p_company_slug: env.PRODYSOS_COMPANY }, délais);
+  const data = await rpc(env, { fonction: 'get_public_company_shows', corps: { p_company_slug: env.PRODYSOS_COMPANY } }, délais);
   if (!data) {
     throw new Error(
       `Prodysos ne connaît aucune compagnie publique « ${env.PRODYSOS_COMPANY} » : ` +

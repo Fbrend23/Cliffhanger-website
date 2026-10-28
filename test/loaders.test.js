@@ -271,10 +271,10 @@ test('représentations : les dates de Prodysos rejoignent celles du CMS', async 
 
 test('vidéo du menu : refusée si ce n’est pas du MP4, avec un warning', async () => {
   const { ctx, avertissements } = contexte();
-  const adresse = await L.publierVidéoMenu({ id: 'x', type: 'video/webm' }, null, ctx.config.root, ctx.logger);
+  const adresse = await L.publierVidéoMenu({ id: 'x', type: 'video/webm' }, { cache: null, racine: ctx.config.root, logger: ctx.logger });
   assert.equal(adresse, null);
   assert.equal(avertissements.length, 1);
-  assert.equal(await L.publierVidéoMenu(null, null, ctx.config.root, ctx.logger), null);
+  assert.equal(await L.publierVidéoMenu(null, { cache: null, racine: ctx.config.root, logger: ctx.logger }), null);
 });
 
 test('réglages et Montréal : singletons, fonds par id de photo', async () => {

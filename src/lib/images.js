@@ -27,12 +27,10 @@ import { getImage } from 'astro:assets';
  *
  * @param {import('astro').ImageMetadata} image
  * @param {Taille|null|undefined} taille  les dimensions de l'original, lues par le loader
- * @param {number[]} largeurs
- * @param {string} sizes
- * @param {{ qualité?: number, avif?: boolean }} [options]
+ * @param {{ largeurs: number[], sizes: string, qualité?: number, avif?: boolean }} options
  * @returns {Promise<Réactive>}
  */
-async function réactive(image, taille, largeurs, sizes, { qualité = 78, avif = false } = {}) {
+async function réactive(image, taille, { largeurs, sizes, qualité = 78, avif = false }) {
   const max = taille?.width ?? Math.max(...largeurs);
   const retenues = largeurs.filter((l) => l < max);
   const width = Math.min(max, Math.max(...largeurs));
@@ -121,11 +119,11 @@ function taillePortrait({ width, height }) {
  * @returns {Promise<Réactive>}
  */
 export async function heros(image, taille, { portrait = null, apercu = null } = {}) {
-  const options = { qualité: QUALITÉ_PLEIN_ÉCRAN, avif: true };
-  const r = await réactive(image, taille, PLEIN_ÉCRAN, couvre(taille), options);
+  const qualités = { qualité: QUALITÉ_PLEIN_ÉCRAN, avif: true };
+  const r = await réactive(image, taille, { largeurs: PLEIN_ÉCRAN, sizes: couvre(taille), ...qualités });
   if (portrait && taille?.width && taille?.height) {
     const tp = taillePortrait(taille);
-    const p = await réactive(portrait, tp, PORTRAIT_LARGEURS, couvre(PORTRAIT), options);
+    const p = await réactive(portrait, tp, { largeurs: PORTRAIT_LARGEURS, sizes: couvre(PORTRAIT), ...qualités });
     r.portrait = { srcset: p.srcset, avif: p.avif, sizes: p.sizes };
   }
   r.apercu = apercu;
@@ -151,7 +149,7 @@ export const herosPhoto = (photo) =>
  * @param {import('astro').ImageMetadata} image
  * @param {Taille|null|undefined} taille
  */
-export const affiche = (image, taille) => réactive(image, taille, [400, 800, 1200], '(max-width: 40em) 100vw, 40rem');
+export const affiche = (image, taille) => réactive(image, taille, { largeurs: [400, 800, 1200], sizes: '(max-width: 40em) 100vw, 40rem' });
 
 /**
  * Une photo du carrousel : 38rem de haut au plus, sa largeur suit son
@@ -159,7 +157,7 @@ export const affiche = (image, taille) => réactive(image, taille, [400, 800, 12
  * @param {import('astro').ImageMetadata} image
  * @param {Taille|null|undefined} taille
  */
-export const diapo = (image, taille) => réactive(image, taille, [700, 1100, 1600], '(max-width: 40em) 90vw, 45vw');
+export const diapo = (image, taille) => réactive(image, taille, { largeurs: [700, 1100, 1600], sizes: '(max-width: 40em) 90vw, 45vw' });
 
 /**
  * La vignette de la galerie : `columns-[3_18rem]` dans une page de 96rem au
@@ -175,12 +173,10 @@ export const diapo = (image, taille) => réactive(image, taille, [700, 1100, 160
  * @param {string|null} [apercu]
  */
 export async function vignetteGalerie(image, taille, apercu = null) {
-  const r = await réactive(
-    image,
-    taille,
-    [480, 800, 1200],
-    '(max-width: 39em) calc(100vw - 2rem), (max-width: 60em) calc(50vw - 1.5rem), (max-width: 104em) calc(100vw / 3 - 2rem), 31.5rem'
-  );
+  const r = await réactive(image, taille, {
+    largeurs: [480, 800, 1200],
+    sizes: '(max-width: 39em) calc(100vw - 2rem), (max-width: 60em) calc(50vw - 1.5rem), (max-width: 104em) calc(100vw / 3 - 2rem), 31.5rem',
+  });
   r.apercu = apercu;
   return r;
 }
@@ -192,7 +188,7 @@ export async function vignetteGalerie(image, taille, apercu = null) {
  * @param {import('astro').ImageMetadata} image
  * @param {Taille|null|undefined} taille
  */
-export const grande = (image, taille) => réactive(image, taille, [1200, 2048, 2560, 3200], contient(taille), { qualité: QUALITÉ_PLEIN_ÉCRAN, avif: true });
+export const grande = (image, taille) => réactive(image, taille, { largeurs: [1200, 2048, 2560, 3200], sizes: contient(taille), qualité: QUALITÉ_PLEIN_ÉCRAN, avif: true });
 
 /**
  * L'image des partages : les réseaux veulent un JPEG de 1200 px.

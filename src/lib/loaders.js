@@ -113,12 +113,10 @@ function adresseWeb(valeur, logger, où) {
  * on dit ce qui s'écarte de « lettres minuscules, chiffres, tirets », ou ce qui
  * en écrase un autre : `store.set` garderait silencieusement le dernier.
  *
- * @param {{ warn(m: string): void }} logger
- * @param {string} où
+ * @param {{ logger: { warn(m: string): void }, où: string, vus: Set<string> }} collection  `vus` : les slugs déjà rencontrés dans cette collection
  * @param {string} slug
- * @param {Set<string>} vus  les slugs déjà rencontrés dans cette collection
  */
-export function signalerSlug(logger, où, slug, vus) {
+export function signalerSlug({ logger, où, vus }, slug) {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
     logger.warn(`${où} : le slug « ${slug} » n'est pas une adresse propre (minuscules, chiffres et tirets). À corriger dans le Studio.`);
   }
@@ -197,7 +195,7 @@ export function spectaclesLoader() {
           logger.warn(`spectacle ${s.id} sans slug ou sans titre : ignoré`);
           return null;
         }
-        signalerSlug(logger, `spectacle « ${title} »`, slug, slugsVus);
+        signalerSlug({ logger, où: `spectacle « ${title} »`, vus: slugsVus }, slug);
         if (!s.hero?.id) {
           logger.warn(`spectacle « ${title} » sans grande photo : ignoré`);
           return null;
@@ -390,7 +388,7 @@ export function personnesLoader() {
           logger.warn(`personne ${p.id} sans slug ou sans nom : ignorée`);
           continue;
         }
-        signalerSlug(logger, `personne « ${name} »`, slug, slugsVus);
+        signalerSlug({ logger, où: `personne « ${name} »`, vus: slugsVus }, slug);
         signalerTirets(logger, `personne « ${name} »`, [p.name, p.bio]);
         const groupe = ['equipe', 'invite', 'montreal'].includes(p.groupe) ? p.groupe : 'equipe';
         const réseau = (/** @type {string} */ champ) => adresseWeb(p[champ], logger, `personne « ${name} », ${champ}`);
@@ -546,12 +544,10 @@ const MÉDIAS_REL = 'public/media';
  * le menu retombe alors sur `public/menu.mp4`.
  *
  * @param {{id:string, type?:string, modified_on?:string, filename_download?:string}|null|undefined} fichier
- * @param {import('./directus.js').Cache} cache
- * @param {URL} racine
- * @param {{ info(msg:string):void, warn(msg:string):void }} logger
+ * @param {{ cache: import('./directus.js').Cache, racine: URL, logger: { info(msg:string):void, warn(msg:string):void } }} contexte
  * @returns {Promise<string|null>}
  */
-export async function publierVidéoMenu(fichier, cache, racine, logger) {
+export async function publierVidéoMenu(fichier, { cache, racine, logger }) {
   const dossier = path.join(fileURLToPath(racine), MÉDIAS_REL);
   // Les anciennes vidéos partent d'abord : une seule à la fois dans dist/.
   const vider = async (/** @type {string|null} */ garder = null) => {
@@ -611,7 +607,7 @@ export function reglagesLoader() {
 
       const og_image = s.og_image?.id ? await assurerFichier(s.og_image, cache, logger) : null;
       const menu_poster = s.menu_poster?.id ? await assurerFichier(s.menu_poster, cache, logger) : null;
-      const menu_video = await publierVidéoMenu(s.menu_video, cache, config.root, logger);
+      const menu_video = await publierVidéoMenu(s.menu_video, { cache, racine: config.root, logger });
       await cache.enregistrer();
 
       /** @param {any} v */
