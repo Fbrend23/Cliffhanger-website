@@ -108,6 +108,65 @@ function adresseWeb(valeur, logger, où) {
 }
 
 /**
+ * Le slug et le titre d'un spectacle du CMS, ou null (et un avertissement) s'il lui manque
+ * l'un des deux ou sa grande photo : il n'est alors pas publié.
+ * @param {any} s
+ * @param {{ logger: any, vus: Set<string> }} contexte  `vus` : les slugs déjà rencontrés
+ * @returns {{ slug: string, title: string } | null}
+ */
+function identitéSpectacle(s, { logger, vus }) {
+  const slug = texte(s.slug);
+  const title = texte(s.title);
+  if (!slug || !title) {
+    logger.warn(`spectacle ${s.id} sans slug ou sans titre : ignoré`);
+    return null;
+  }
+  signalerSlug({ logger, où: `spectacle « ${title} »`, vus }, slug);
+  if (!s.hero?.id) {
+    logger.warn(`spectacle « ${title} » sans grande photo : ignoré`);
+    return null;
+  }
+  return { slug, title };
+}
+
+/** @param {{ troupe?: string|null }} s */
+const troupeDe = (s) => (s.troupe === 'montreal' ? 'montreal' : 'bruxelles');
+
+/**
+ * Tout ce qui se rend d'un spectacle : le point focal se déplace sans que le fichier change, il
+ * doit invalider l'entrée lui aussi ; l'affiche et le synopsis de Prodysos aussi.
+ * @param {any} s
+ * @param {any} show  le spectacle Prodysos relié, ou undefined
+ */
+const digestSpectacle = (s, show) => JSON.stringify([s, s.hero?.modified_on, s.poster?.modified_on, show?.poster_url ?? null, show?.synopsis ?? null]);
+
+/**
+ * L'affiche d'un spectacle : celle du CMS, sinon celle de sa page publique Prodysos.
+ * @param {any} s  la ligne du CMS
+ * @param {any} show  le spectacle Prodysos relié, ou undefined
+ * @param {{ cache: import('./directus.js').Cache, logger: any }} contexte
+ */
+async function afficheDuSpectacle(s, show, { cache, logger }) {
+  if (s.poster?.id) {
+    return { poster: await assurerFichier(s.poster, cache, logger), posterTaille: await dimensionsFichier(s.poster, cache) };
+  }
+  if (!texte(show?.poster_url)) return { poster: null, posterTaille: null };
+  const a = await assurerFichierExterne(show.poster_url.trim(), idAfficheProdysos(show.slug), { cache, logger });
+  return { poster: a.chemin, posterTaille: { width: a.width, height: a.height } };
+}
+
+/**
+ * Les ids des photos du carrousel d'un spectacle, dans l'ordre du Studio.
+ * @param {any[]|null|undefined} slides  la jonction du CMS
+ * @returns {string[]}
+ */
+const idsDesDiapos = (slides) =>
+  (slides ?? [])
+    .map((l) => l?.[`${PHOTOS}_id`])
+    .filter((id) => id != null)
+    .map(String);
+
+/**
  * Un slug fait l'adresse de la page : on ne refuse pas l'entrée (la page existe
  * peut-être déjà, et changer son adresse est la décision de la compagnie), mais
  * on dit ce qui s'écarte de « lettres minuscules, chiffres, tirets », ou ce qui
@@ -189,17 +248,9 @@ export function spectaclesLoader() {
       // changeaient de place d'un build à l'autre.
       const slugsVus = new Set();
       const entrées = await mapLimit(lignes, 3, async (s) => {
-        const slug = texte(s.slug);
-        const title = texte(s.title);
-        if (!slug || !title) {
-          logger.warn(`spectacle ${s.id} sans slug ou sans titre : ignoré`);
-          return null;
-        }
-        signalerSlug({ logger, où: `spectacle « ${title} »`, vus: slugsVus }, slug);
-        if (!s.hero?.id) {
-          logger.warn(`spectacle « ${title} » sans grande photo : ignoré`);
-          return null;
-        }
+        const identité = identitéSpectacle(s, { logger, vus: slugsVus });
+        if (!identité) return null;
+        const { slug, title } = identité;
         const show = deProdysos.get(slug);
         const text = texte(s.text) ?? synopsisEnHtml(show?.synopsis);
         signalerTirets(logger, `spectacle « ${title} »`, [s.title, s.punch, s.cite, text, s.credit, s.duration]);
@@ -209,16 +260,7 @@ export function spectaclesLoader() {
         // tenus droits, et son aperçu flou (lib/directus.js).
         const heroPortrait = await assurerPortrait(s.hero.id, focal, { cache, logger });
         const heroApercu = await assurerAperçu(s.hero.id, cache);
-        let poster = null;
-        let posterTaille = null;
-        if (s.poster?.id) {
-          poster = await assurerFichier(s.poster, cache, logger);
-          posterTaille = await dimensionsFichier(s.poster, cache);
-        } else if (texte(show?.poster_url)) {
-          const a = await assurerFichierExterne(show.poster_url.trim(), idAfficheProdysos(show.slug), { cache, logger });
-          poster = a.chemin;
-          posterTaille = { width: a.width, height: a.height };
-        }
+        const { poster, posterTaille } = await afficheDuSpectacle(s, show, { cache, logger });
         const data = await parseData({
           id: slug,
           filePath: MANIFEST_REL,
@@ -226,7 +268,7 @@ export function spectaclesLoader() {
             slug,
             title,
             year: s.year ?? null,
-            troupe: s.troupe === 'montreal' ? 'montreal' : 'bruxelles',
+            troupe: troupeDe(s),
             punch: texte(s.punch),
             cite: texte(s.cite),
             text,
@@ -240,17 +282,14 @@ export function spectaclesLoader() {
             focal,
             poster,
             posterTaille,
-            slides: (s.slides ?? []).map((/** @type {any} */ l) => l?.[`${PHOTOS}_id`]).filter((/** @type {unknown} */ id) => id != null).map(String),
+            slides: idsDesDiapos(s.slides),
           },
         });
         return {
           id: slug,
           data,
           filePath: MANIFEST_REL,
-          // Tout ce qui se rend : le point focal se déplace sans que le
-          // fichier change, il doit invalider l'entrée lui aussi ; l'affiche
-          // et le synopsis de Prodysos aussi.
-          digest: JSON.stringify([s, s.hero?.modified_on, s.poster?.modified_on, show?.poster_url ?? null, show?.synopsis ?? null]),
+          digest: digestSpectacle(s, show),
         };
         // Le manifeste est enregistré même si un téléchargement échoue : sans
         // lui, ce qui a déjà été téléchargé serait à refaire au build suivant.
@@ -270,6 +309,78 @@ export function spectaclesLoader() {
       for (const e of gardées) store.set(e);
       logger.info(`${gardées.length} spectacle(s) chargé(s)`);
     },
+  };
+}
+
+/**
+ * Les photos qui servent ailleurs que dans la galerie : celles des carrousels, et les fonds de
+ * page des réglages. Les fonds couvrent l'écran : eux seuls ont un recadrage portrait. Astro émet
+ * l'original de tout champ image() ; un portrait que rien ne sert partirait en ligne tel quel.
+ * @param {any[]} spectacles  leurs carrousels (`slides`)
+ * @param {any} réglages
+ */
+function photosServies(spectacles, réglages) {
+  const servies = new Set();
+  for (const s of spectacles) for (const l of s.slides ?? []) if (l?.[`${PHOTOS}_id`] != null) servies.add(String(l[`${PHOTOS}_id`]));
+  const fonds = new Set(FONDS.map((f) => réglages?.[f]).filter((id) => id != null).map(String));
+  for (const id of fonds) servies.add(id);
+  return { servies, fonds };
+}
+
+/**
+ * Ce que le cache doit garder : tout fichier encore affiché.
+ * @param {{ photos: any[], servies: Set<string>, autres: any[], réglages: any, prodysos: { shows?: any[] } }} lecture
+ */
+function fichiersÀGarder({ photos, servies, autres, réglages, prodysos }) {
+  /** @param {unknown[]} ids */
+  const présents = (ids) => ids.filter(Boolean).map(String);
+  const affichées = photos.filter((p) => p.galerie || servies.has(String(p.id)));
+  // Toutes les affiches de Prodysos : seules celles qui manquent au CMS
+  // sont téléchargées, garder les autres ne coûte rien.
+  const affiches = (prodysos.shows ?? []).filter((show) => texte(show?.poster_url)).map((show) => idAfficheProdysos(show.slug));
+  return new Set([
+    ...présents(affichées.map((p) => p.image?.id)),
+    ...présents(autres.flatMap((s) => [s.hero, s.poster])),
+    ...présents([réglages?.og_image, réglages?.menu_video, réglages?.menu_poster]),
+    ...affiches,
+  ]);
+}
+
+/**
+ * La légende d'une photo retombe sur le titre du spectacle, sinon « Coulisses » : elle est aussi
+ * le texte alternatif, et une photo n'en est jamais privée.
+ * @param {any} p
+ */
+const légendeDePhoto = (p) => texte(p.caption) ?? texte(p.spectacle?.title) ?? T.coulisses;
+
+/**
+ * Une ligne du CMS en représentation, ou null (et un avertissement) s'il lui manque son spectacle
+ * (dépublié) ou son jour.
+ * @param {any} r
+ * @param {{ prixDe: Map<string, string|null>, logger: any }} contexte  `prixDe` : le prix du spectacle, à défaut de celui de la date
+ * @returns {Représentation | null}
+ */
+function représentationDuCms(r, { prixDe, logger }) {
+  const spectacle = texte(r.spectacle?.slug);
+  const day = typeof r.day === 'string' ? r.day.slice(0, 10) : null;
+  if (!spectacle || !day) {
+    logger.warn(`représentation ${r.id} : spectacle dépublié ou jour vide, ligne ignorée`);
+    return null;
+  }
+  signalerTirets(logger, `représentation ${r.id}`, [r.venue, r.city, r.price]);
+  return {
+    id: String(r.id),
+    spectacle,
+    day,
+    // Directus rend « 20:00:00 » : on garde les heures et minutes.
+    time: typeof r.time === 'string' && r.time ? r.time.slice(0, 5) : null,
+    venue: texte(r.venue),
+    city: texte(r.city),
+    // Le CMS n'a que la salle et la ville ; la rue vient de Prodysos.
+    street: null,
+    postalCode: null,
+    price: texte(r.price) ?? prixDe.get(spectacle) ?? null,
+    reservation: null,
   };
 }
 
@@ -301,13 +412,7 @@ export function photosLoader() {
 
       const autres = await requestAll(`/items/${SPECTACLES}?${PUBLIÉ}&fields=hero,poster,slides.${PHOTOS}_id`);
       const réglages = await request(`/items/${REGLAGES}?fields=og_image,menu_video,menu_poster,${FONDS.join(',')}`);
-      const servies = new Set();
-      for (const s of autres) for (const l of s.slides ?? []) if (l?.[`${PHOTOS}_id`] != null) servies.add(String(l[`${PHOTOS}_id`]));
-      // Les fonds couvrent l'écran : eux seuls ont un recadrage portrait.
-      // Astro émet l'original de tout champ image() ; un portrait que rien ne
-      // sert partirait en ligne tel quel.
-      const fonds = new Set(FONDS.map((f) => réglages?.[f]).filter((id) => id != null).map(String));
-      for (const id of fonds) servies.add(id);
+      const { servies, fonds } = photosServies(autres, réglages);
 
       let ignorées = 0;
       // Même règle que les spectacles : téléchargées en parallèle, rangées
@@ -321,10 +426,7 @@ export function photosLoader() {
           logger.warn(`photo ${p.id} sans image : ignorée`);
           return null;
         }
-        // La légende retombe sur le titre du spectacle, sinon « Coulisses » :
-        // elle est aussi le texte alternatif, et une photo n'en est jamais
-        // privée.
-        const caption = texte(p.caption) ?? texte(p.spectacle?.title) ?? T.coulisses;
+        const caption = légendeDePhoto(p);
         signalerTirets(logger, `photo ${p.id}`, [caption]);
         const id = String(p.id);
         const image = await assurerFichier(p.image, cache, logger);
@@ -354,12 +456,7 @@ export function photosLoader() {
       // Ce que le cache doit garder : tout fichier encore affiché. Le reste
       // (photos supprimées, dépubliées ou qui ne servent plus, affiches
       // remplacées) s'en va, sinon le cache ne fait que grossir.
-      const garder = new Set(photos.filter((p) => p.galerie || servies.has(String(p.id))).map((p) => p.image?.id).filter(Boolean));
-      for (const s of autres) for (const f of [s.hero, s.poster]) if (f) garder.add(String(f));
-      for (const f of [réglages?.og_image, réglages?.menu_video, réglages?.menu_poster]) if (f) garder.add(String(f));
-      // Toutes les affiches de Prodysos : seules celles qui manquent au CMS
-      // sont téléchargées, garder les autres ne coûte rien.
-      for (const show of prodysos.shows ?? []) if (texte(show?.poster_url)) garder.add(idAfficheProdysos(show.slug));
+      const garder = fichiersÀGarder({ photos, servies, autres, réglages, prodysos });
       const retirés = await purgerCache(cache, garder);
       if (retirés) logger.info(`cache : ${retirés} fichier(s) retiré(s)`);
 
@@ -462,31 +559,7 @@ export function representationsLoader() {
       ]);
       const prixDe = new Map(prodysos.spectaclesCms.map((s) => [s.slug, texte(s.price)]));
 
-      /** @type {Représentation[]} */
-      const duCms = [];
-      for (const r of lignes) {
-        const spectacle = texte(r.spectacle?.slug);
-        const day = typeof r.day === 'string' ? r.day.slice(0, 10) : null;
-        if (!spectacle || !day) {
-          logger.warn(`représentation ${r.id} : spectacle dépublié ou jour vide, ligne ignorée`);
-          continue;
-        }
-        signalerTirets(logger, `représentation ${r.id}`, [r.venue, r.city, r.price]);
-        duCms.push({
-          id: String(r.id),
-          spectacle,
-          day,
-          // Directus rend « 20:00:00 » : on garde les heures et minutes.
-          time: typeof r.time === 'string' && r.time ? r.time.slice(0, 5) : null,
-          venue: texte(r.venue),
-          city: texte(r.city),
-          // Le CMS n'a que la salle et la ville ; la rue vient de Prodysos.
-          street: null,
-          postalCode: null,
-          price: texte(r.price) ?? prixDe.get(spectacle) ?? null,
-          reservation: null,
-        });
-      }
+      const duCms = lignes.map((r) => représentationDuCms(r, { prixDe, logger })).filter((r) => r !== null);
 
       /** @type {Représentation[]} */
       let deProdysos = [];
