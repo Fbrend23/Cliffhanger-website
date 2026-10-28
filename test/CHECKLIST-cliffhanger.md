@@ -76,9 +76,9 @@ Type : Site statique. Générée le 23.10.2026.
 - [x] `prefers-reduced-motion` géré (CSS et JS)
 - [x] Fonctionne sans JavaScript
 - [ ] Contrastes, textes alternatifs, labels de formulaire
-- [ ] Cibles cliquables d'au moins 24x24 px (44x44 sur mobile)
+- [x] Cibles cliquables d'au moins 24x24 px (44x44 sur mobile)
 - [x] Zoom non bloqué, `color-scheme` si mode sombre
-- [ ] Test à 390, 820 et 1440 px
+- [x] Test à 390, 820 et 1440 px
 - [ ] axe ou Lighthouse sans erreur grave, test lecteur d'écran
 
 ## 11. SEO (11)
