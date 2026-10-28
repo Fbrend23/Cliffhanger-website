@@ -13,13 +13,15 @@ const { chemin } = Astro.props;
 
 <nav aria-label={chemin.at(-1)?.nom} class="mb-4 text-sm opacity-75">
   <ol class="flex flex-wrap gap-x-2">
-    {
-      chemin.map((é, i) => (
-        <li class="flex gap-x-2">
-          {i > 0 && <span aria-hidden="true">›</span>}
-          {é.href ? <a class="lien-souligne" href={é.href} set:html={tx(é.nom)} /> : <span aria-current="page" set:html={tx(é.nom)} />}
-        </li>
-      ))
-    }
+    {chemin.map((é, i) => (
+      <li class="flex gap-x-2">
+        {i > 0 && <span aria-hidden="true">›</span>}
+        {é.href ? (
+          <a class="lien-souligne inline-flex min-h-6 items-center tactile:min-h-11" href={é.href} set:html={tx(é.nom)} />
+        ) : (
+          <span aria-current="page" set:html={tx(é.nom)} />
+        )}
+      </li>
+    ))}
   </ol>
 </nav>
