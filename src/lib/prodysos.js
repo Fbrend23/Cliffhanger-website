@@ -430,6 +430,7 @@ export async function réserver(prodysos, demande) {
     signal: AbortSignal.timeout(15_000),
   });
   if (res.ok) return { ok: true };
+  // Un refus sans corps lisible (page d'erreur du proxy) : le message par défaut du formulaire s'affiche.
   const corps = await res.json().catch(() => null);
   return { ok: false, message: typeof corps?.message === 'string' && corps.message.trim() ? corps.message.trim() : null };
 }

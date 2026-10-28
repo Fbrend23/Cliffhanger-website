@@ -107,10 +107,10 @@ Type : Site statique. Générée le 23.10.2026.
 ## 13. Clean code (13)
 - [ ] Noms explicites, 3 paramètres au plus
 - [ ] Fonctions courtes à une seule responsabilité
-- [ ] Retours anticipés, 3 niveaux d'imbrication au maximum
+- [x] Retours anticipés, 3 niveaux d'imbrication au maximum
 - [ ] Aucun nombre ou texte magique, constantes nommées
 - [ ] Commentaires = pourquoi, aucun code mort ni code commenté (knip)
-- [ ] Aucune erreur avalée, messages d'erreur avec contexte
+- [x] Aucune erreur avalée, messages d'erreur avec contexte
 - [ ] DRY à la troisième répétition (jscpd), sans abstraction prématurée
 - [x] YAGNI : rien écrit pour plus tard, le plus simple qui marche
-- [ ] Règles ESLint de complexité actives, appliquées par la CI
+- [x] Règles ESLint de complexité actives, appliquées par la CI

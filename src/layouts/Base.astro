@@ -332,6 +332,7 @@ const entrée =
         if (ouvert) {
           // Filet : tout part déjà au repos, ceci ne sert qu'à un clic avant la fin du chargement.
           préparerMenu();
+          // Lecture refusée (démarrage automatique bloqué) : l'image fixe du menu reste.
           if (!sobre()) vidéo.play().catch(() => {});
           m.querySelector('a')?.focus({ preventScroll: true });
         } else {

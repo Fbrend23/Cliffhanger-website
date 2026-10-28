@@ -120,6 +120,7 @@ const tuiles = await Promise.all(
           img.addEventListener('load', () => ok(), { once: true });
           img.addEventListener('error', () => échec(), { once: true });
         })
+          // Un décodage refusé n'empêche pas l'image de s'afficher au chargement.
           .then(() => img.decode().catch(() => {}))
           .then(() => cadre);
         // Une image en échec pourra être redemandée.
@@ -168,7 +169,9 @@ const tuiles = await Promise.all(
         .then((cadre) => {
           if (position === i && boîte.open) afficher(cadre, alt, ratio);
         })
+        // Photo introuvable : la vignette agrandie reste à l'écran, il n'y a rien d'autre à montrer.
         .catch(() => {});
+      // Les voisines sont un préchargement : qu'il échoue ne regarde personne.
       if (!économe) for (const pas of [1, -1]) charger((i + pas + vignettes.length) % vignettes.length, 'low').catch(() => {});
     };
     const avancer = (pas: number) => {
