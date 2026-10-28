@@ -92,12 +92,11 @@ function verdict(res, limites, pannes) {
 
 /**
  * @param {string} url
- * @param {{ délai?: number }} [options]  `délai` : durée maximale de l'échange, corps compris
+ * @param {number} [délai]  durée maximale de l'échange, corps compris
  * @returns {Promise<Response>}
  */
-async function appeler(url, options) {
+async function appeler(url, délai = DÉLAIS.max) {
   const adresse = url.replace(DIRECTUS_URL, '');
-  const délai = options?.délai ?? DÉLAIS.max;
   const headers = { Authorization: `Bearer ${DIRECTUS_TOKEN}` };
   let limites = 0;
   let pannes = 0;
@@ -272,8 +271,9 @@ export async function purgerCache(cache, garder) {
 export async function assurerFichier(fichier, cache, logger) {
   const ext = (path.extname(fichier.filename_download ?? '').slice(1) || fichier.type?.split('/')[1] || 'jpg').toLowerCase();
   const nom = `${fichier.id}.${ext}`;
-  await ranger(cache, fichier.id, nom, fichier.modified_on ?? '', logger, fichier.filename_download ?? fichier.id, () =>
-    appeler(`${DIRECTUS_URL}/assets/${fichier.id}`, { délai: DÉLAIS.fichier })
+  const libellé = fichier.filename_download ?? fichier.id;
+  await ranger({ cache, logger, id: fichier.id, nom, version: fichier.modified_on ?? '', libellé }, () =>
+    appeler(`${DIRECTUS_URL}/assets/${fichier.id}`, DÉLAIS.fichier)
   );
   return `./${nom}`;
 }
@@ -308,14 +308,13 @@ export async function dimensionsFichier(fichier, cache) {
  *
  * @param {string} url
  * @param {string} id  sans point (voir purgerCache)
- * @param {Cache} cache
- * @param {{ info(msg:string):void }} logger
+ * @param {{ cache: Cache, logger: { info(msg:string):void } }} contexte
  * @returns {Promise<{ chemin: string, width: number|null, height: number|null }>}
  */
-export async function assurerFichierExterne(url, id, cache, logger) {
+export async function assurerFichierExterne(url, id, { cache, logger }) {
   const ext = (path.extname(new URL(url).pathname).slice(1) || 'jpg').toLowerCase();
   const nom = `${id}.${ext}`;
-  await ranger(cache, id, nom, url, logger, url, async () => {
+  await ranger({ cache, logger, id, nom, version: url, libellé: url }, async () => {
     let res;
     try {
       res = await fetch(url);
@@ -337,15 +336,16 @@ export async function assurerFichierExterne(url, id, cache, logger) {
  * L'écriture passe par un `.part` renommé à la fin : un build interrompu ne
  * laisse jamais un fichier à moitié écrit que le suivant croirait complet.
  *
- * @param {Cache} cache
- * @param {string} id  la clé du manifeste, et le début du nom
- * @param {string} nom  `<id>.<ext>`
- * @param {string} version  ce qui change quand le fichier change
- * @param {{ info(msg:string):void }} logger
- * @param {string} libellé  pour le log
+ * @param {object} fichier
+ * @param {Cache} fichier.cache
+ * @param {{ info(msg:string):void }} fichier.logger
+ * @param {string} fichier.id  la clé du manifeste, et le début du nom
+ * @param {string} fichier.nom  `<id>.<ext>`
+ * @param {string} fichier.version  ce qui change quand le fichier change
+ * @param {string} fichier.libellé  pour le log
  * @param {() => Promise<Response>} charger
  */
-async function ranger(cache, id, nom, version, logger, libellé, charger) {
+async function ranger({ cache, logger, id, nom, version, libellé }, charger) {
   const cible = path.join(cache.dossier, nom);
   const connu = cache.manifest[id];
   if (connu?.modified_on === version && connu.fichier === nom && (await existe(cible))) return;
@@ -452,11 +452,10 @@ export function cadrePortrait(W, H, focal) {
  *
  * @param {string} id  la clé du manifeste
  * @param {{x:number, y:number}|null} focal
- * @param {Cache} cache
- * @param {{ info(msg:string):void }} logger
+ * @param {{ cache: Cache, logger: { info(msg:string):void } }} contexte
  * @returns {Promise<string>}  le chemin relatif au manifeste, comme `assurerFichier`
  */
-export async function assurerPortrait(id, focal, cache, logger) {
+export async function assurerPortrait(id, focal, { cache, logger }) {
   const entrée = cache.manifest[id];
   if (!entrée) throw new Error(`portrait demandé pour ${id} avant son téléchargement`);
   const clé = focal ? `${focal.x},${focal.y}` : 'centre';

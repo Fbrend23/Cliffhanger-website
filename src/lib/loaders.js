@@ -209,7 +209,7 @@ export function spectaclesLoader() {
         const focal = pointFocal(s.hero);
         // La grande photo couvre l'écran : son recadrage pour les téléphones
         // tenus droits, et son aperçu flou (lib/directus.js).
-        const heroPortrait = await assurerPortrait(s.hero.id, focal, cache, logger);
+        const heroPortrait = await assurerPortrait(s.hero.id, focal, { cache, logger });
         const heroApercu = await assurerAperçu(s.hero.id, cache);
         let poster = null;
         let posterTaille = null;
@@ -217,7 +217,7 @@ export function spectaclesLoader() {
           poster = await assurerFichier(s.poster, cache, logger);
           posterTaille = await dimensionsFichier(s.poster, cache);
         } else if (texte(show?.poster_url)) {
-          const a = await assurerFichierExterne(show.poster_url.trim(), idAfficheProdysos(show.slug), cache, logger);
+          const a = await assurerFichierExterne(show.poster_url.trim(), idAfficheProdysos(show.slug), { cache, logger });
           poster = a.chemin;
           posterTaille = { width: a.width, height: a.height };
         }
@@ -340,7 +340,7 @@ export function photosLoader() {
             spectacle: texte(p.spectacle?.slug),
             sort: p.sort ?? 0,
             image,
-            portrait: fonds.has(id) ? await assurerPortrait(p.image.id, focal, cache, logger) : null,
+            portrait: fonds.has(id) ? await assurerPortrait(p.image.id, focal, { cache, logger }) : null,
             apercu: await assurerAperçu(p.image.id, cache),
             ...(await dimensionsFichier(p.image, cache)),
             focal,
