@@ -249,7 +249,7 @@ const entrée =
           T.menu.map((l, i) => (
             <li class={entrée} style={`--i:${i + 1}`}>
               <a
-                class="inline-block px-3 py-1 opacity-75 transition-opacity duration-250 hover:opacity-100 focus-visible:opacity-100 aria-[current=page]:opacity-100 data-en-cours:opacity-100 sans-js:pl-0"
+                class="relative inline-block px-3 py-1 tactile:after:absolute tactile:after:inset-x-0 tactile:after:-inset-y-[.2rem] opacity-75 transition-opacity duration-250 hover:opacity-100 focus-visible:opacity-100 aria-[current=page]:opacity-100 data-en-cours:opacity-100 sans-js:pl-0"
                 href={l.href}
                 aria-current={l.href === rubrique ? 'page' : undefined}
                 set:html={tx(l.label)}
