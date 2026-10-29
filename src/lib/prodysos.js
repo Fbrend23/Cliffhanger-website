@@ -37,6 +37,11 @@ export function prodysosConfiguré(env) {
 // Un 522 de Cloudflare devant Supabase est souvent un raté de quelques
 // secondes : deux nouveaux essais avant de faire échouer le build.
 const DÉLAIS = [2000, 5000];
+// Délais de coupure d'un échange : la lecture des spectacles (jusqu'au build), puis la demande de réservation (une personne attend).
+const DÉLAI_LECTURE_MS = 30_000;
+const DÉLAI_RÉSERVATION_MS = 15_000;
+// Longueur du corps d'une erreur Prodysos repris dans le message.
+const DÉTAIL_ERREUR_MAX = 300;
 
 /**
  * @param {EnvProdysos} env
@@ -52,7 +57,7 @@ async function rpc(env, { fonction, corps }, délais = DÉLAIS) {
         headers: { apikey: env.PRODYSOS_KEY, Authorization: `Bearer ${env.PRODYSOS_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(corps),
         // Sans délai, une connexion figée tiendrait le déploiement jusqu'aux 20 min du job.
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(DÉLAI_LECTURE_MS),
       });
     } catch (e) {
       // Une erreur réseau est aussi passagère qu'un 5xx : mêmes essais.
@@ -84,7 +89,7 @@ function attendre(ms, fonction, raison) {
 async function décrireErreur(res) {
   const détail = await res.text().catch(() => '');
   if ((res.headers.get('content-type') ?? '').includes('text/html')) return '(page HTML : Prodysos injoignable derrière Cloudflare)';
-  return détail.length > 300 ? `${détail.slice(0, 300)}…` : détail;
+  return détail.length > DÉTAIL_ERREUR_MAX ? `${détail.slice(0, DÉTAIL_ERREUR_MAX)}…` : détail;
 }
 
 /**
@@ -427,7 +432,7 @@ export async function réserver(prodysos, demande) {
     }),
     // Sur un réseau bloqué, « Envoi en cours… » resterait affiché sans fin : au
     // bout de 15 s la fonction lève, comme pour toute erreur réseau.
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(DÉLAI_RÉSERVATION_MS),
   });
   if (res.ok) return { ok: true };
   // Un refus sans corps lisible (page d'erreur du proxy) : le message par défaut du formulaire s'affiche.

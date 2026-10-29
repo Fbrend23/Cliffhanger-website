@@ -74,6 +74,11 @@ export const champsFichier = (relation) => CHAMPS_FICHIER.map((c) => `${relation
 // Un objet exporté, pour que les tests réduisent les attentes.
 export const DÉLAIS = { panne: [2000, 5000], max: 30_000, fichier: 120_000 };
 
+// Rejeux après un 429 avant d'abandonner, et marge ajoutée à ce que demande `Retry-After`.
+const MAX_REJEUX_LIMITE = 5;
+const MARGE_RETRY_AFTER_MS = 50;
+const MS_PAR_SECONDE = 1000;
+
 /** @param {number} ms */
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -86,7 +91,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
  * @returns {'ok' | 'limite' | 'panne' | 'refus'}
  */
 function verdict(res, limites, pannes) {
-  if (res.status === 429 && limites < 5) return 'limite';
+  if (res.status === 429 && limites < MAX_REJEUX_LIMITE) return 'limite';
   if (res.status >= 500 && pannes < DÉLAIS.panne.length) return 'panne';
   return res.ok ? 'ok' : 'refus';
 }
@@ -117,7 +122,7 @@ async function appeler(url, délai = DÉLAIS.max) {
     if (suite === 'refus') throw new Error(`CMS ${adresse} : HTTP ${res.status} ${await res.text().catch(() => '')}`.trim());
     if (suite === 'limite') {
       limites++;
-      await attendre((Number(res.headers.get('retry-after')) || 1) * 1000 + 50);
+      await attendre((Number(res.headers.get('retry-after')) || 1) * MS_PAR_SECONDE + MARGE_RETRY_AFTER_MS);
     } else {
       await attendre(DÉLAIS.panne[pannes++]);
     }
@@ -380,6 +385,9 @@ const enCours = new Map();
 // en base64 dans la page. Le flou est cuit dedans : agrandi cent fois par le
 // navigateur, un aperçu net montrerait ses blocs.
 const APERÇU_LARGEUR = 32;
+// Assez flou et léger pour tenir dans la page (data: URI) sans qu'on y reconnaisse un défaut de la photo.
+const APERÇU_FLOU = 0.8;
+const APERÇU_QUALITÉ = 45;
 
 /**
  * L'aperçu flou d'un fichier du cache, en `data:` URI, posé sous la photo le
@@ -404,8 +412,8 @@ export async function assurerAperçu(id, cache) {
     const buf = await sharp(await readFile(path.join(cache.dossier, entrée.fichier)))
       .rotate()
       .resize(APERÇU_LARGEUR, APERÇU_LARGEUR, { fit: 'inside' })
-      .blur(0.8)
-      .webp({ quality: 45 })
+      .blur(APERÇU_FLOU)
+      .webp({ quality: APERÇU_QUALITÉ })
       .toBuffer();
     entrée.aperçu = `data:image/webp;base64,${buf.toString('base64')}`;
   }
@@ -416,6 +424,8 @@ export async function assurerAperçu(id, cache) {
 // sur les récents), le navigateur rogne encore un peu les côtés avec
 // `object-fit: cover` ; plus large (une tablette), un peu le haut et le bas.
 export const PORTRAIT = 9 / 16;
+/** Le centre de la photo, en %, quand le Studio n'a posé aucun point focal. */
+const FOCAL_CENTRE = 50;
 
 /**
  * Le cadre 9:16 d'une image de W × H autour de son point focal. Même règle
@@ -430,8 +440,8 @@ export const PORTRAIT = 9 / 16;
  * @returns {{ left: number, top: number, width: number, height: number }}
  */
 export function cadrePortrait(W, H, focal) {
-  const x = (focal?.x ?? 50) / 100;
-  const y = (focal?.y ?? 50) / 100;
+  const x = (focal?.x ?? FOCAL_CENTRE) / 100;
+  const y = (focal?.y ?? FOCAL_CENTRE) / 100;
   const width = W / H > PORTRAIT ? Math.round(H * PORTRAIT) : W;
   const height = W / H > PORTRAIT ? H : Math.round(W / PORTRAIT);
   return { left: Math.round((W - width) * x), top: Math.round((H - height) * y), width, height };

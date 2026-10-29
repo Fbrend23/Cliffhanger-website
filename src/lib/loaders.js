@@ -59,6 +59,12 @@ export const MONTREAL = 'cliff_montreal';
 export const REGLAGES = 'cliff_reglages';
 
 /** Les fonds de page des réglages : des ids de photos. */
+// Les téléchargements d'originaux en parallèle : assez pour tenir le build, pas assez pour saturer le CMS.
+const TÉLÉCHARGEMENTS_PARALLÈLES = 3;
+// Longueur d'un extrait cité dans un avertissement du loader.
+const EXTRAIT_MAX = 60;
+// « 20:00:00 » → « 20:00 ».
+const LONGUEUR_HEURE_MINUTES = 5;
 const FONDS = ['fond_accueil', 'fond_spectacles', 'fond_agenda', 'fond_compagnie', 'fond_contact'];
 
 /** Le filtre ceinture : la policy du build l'impose déjà. */
@@ -82,7 +88,7 @@ export const texte = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null
 function signalerTirets(logger, où, valeurs) {
   for (const v of valeurs) {
     if (typeof v === 'string' && /[—–]|\s-\s/.test(v)) {
-      logger.warn(`${où} : tiret long, demi-cadratin ou tiret entouré d'espaces dans « ${v.slice(0, 60)}… », remplacé au rendu. À corriger dans le Studio.`);
+      logger.warn(`${où} : tiret long, demi-cadratin ou tiret entouré d'espaces dans « ${v.slice(0, EXTRAIT_MAX)}… », remplacé au rendu. À corriger dans le Studio.`);
       return;
     }
   }
@@ -101,7 +107,7 @@ function adresseWeb(valeur, logger, où) {
   const url = texte(valeur);
   if (!url) return null;
   if (!/^https?:\/\//i.test(url)) {
-    logger.warn(`${où} : « ${url.slice(0, 60)} » ne commence pas par https://, ignoré.`);
+    logger.warn(`${où} : « ${url.slice(0, EXTRAIT_MAX)} » ne commence pas par https://, ignoré.`);
     return null;
   }
   return url;
@@ -300,7 +306,7 @@ export function spectaclesLoader() {
       const slugsVus = new Set();
       // Le manifeste est enregistré même si un téléchargement échoue : sans
       // lui, ce qui a déjà été téléchargé serait à refaire au build suivant.
-      const entrées = await mapLimit(lignes, 3, (s) =>
+      const entrées = await mapLimit(lignes, TÉLÉCHARGEMENTS_PARALLÈLES, (s) =>
         entréeSpectacle(s, { slugsVus, deProdysos, cache, logger, parseData })
       ).finally(() => cache.enregistrer());
 
@@ -382,7 +388,7 @@ function représentationDuCms(r, { prixDe, logger }) {
     spectacle,
     day,
     // Directus rend « 20:00:00 » : on garde les heures et minutes.
-    time: typeof r.time === 'string' && r.time ? r.time.slice(0, 5) : null,
+    time: typeof r.time === 'string' && r.time ? r.time.slice(0, LONGUEUR_HEURE_MINUTES) : null,
     venue: texte(r.venue),
     city: texte(r.city),
     // Le CMS n'a que la salle et la ville ; la rue vient de Prodysos.
@@ -461,7 +467,7 @@ export function photosLoader() {
       // dans l'ordre du CMS ; le manifeste survit à un téléchargement raté.
       const affichées = photos.filter((p) => p.galerie || servies.has(String(p.id)));
       const ignorées = photos.length - affichées.length;
-      const entrées = await mapLimit(affichées, 3, (p) => entréePhoto(p, { fonds, cache, logger, parseData })).finally(() =>
+      const entrées = await mapLimit(affichées, TÉLÉCHARGEMENTS_PARALLÈLES, (p) => entréePhoto(p, { fonds, cache, logger, parseData })).finally(() =>
         cache.enregistrer()
       );
       store.clear();

@@ -20,11 +20,14 @@ export function formatJour(iso) {
   return `${p.day} ${p.month} ${p.year}`;
 }
 
+// « 20:00:00 » → « 20:00 ».
+const LONGUEUR_HEURE_MINUTES = 5;
+
 /**
  * « 20:00 » ou « 20:00:00 » → « 20h00 ». Vide, rien.
  * @param {string|null|undefined} t
  */
-export const formatHeure = (t) => (t ? t.slice(0, 5).replace(':', 'h') : '');
+export const formatHeure = (t) => (t ? t.slice(0, LONGUEUR_HEURE_MINUTES).replace(':', 'h') : '');
 
 /**
  * Le jour et l'heure d'une représentation : « 17 avr. 2026, 20h00 ».

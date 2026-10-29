@@ -7,6 +7,9 @@
 import { jourEtHeure } from './prodysos.js';
 import { formatPrix } from './dates.js';
 
+const MINUTES_PAR_HEURE = 60;
+const MS_PAR_MINUTE = 60_000;
+
 /** @type {Record<string, string>} */
 const ENTITÉS = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
@@ -99,7 +102,7 @@ export function filAriane(étapes) {
  */
 export function duréeEnMinutes(durée) {
   const h = /(\d+)\s*h(?:\s*(\d{1,2}))?/i.exec(durée ?? '');
-  if (h) return Number(h[1]) * 60 + Number(h[2] ?? 0);
+  if (h) return Number(h[1]) * MINUTES_PAR_HEURE + Number(h[2] ?? 0);
   const m = /(\d+)\s*min/i.exec(durée ?? '');
   return m ? Number(m[1]) : null;
 }
@@ -170,7 +173,7 @@ export function organisation({ nom, url, description = null, email = null, rése
 function fin(spectacle, r, début) {
   const minutes = r.time ? duréeEnMinutes(spectacle.duration) : null;
   if (!minutes) return null;
-  const finale = jourEtHeure(Date.parse(début) + minutes * 60_000);
+  const finale = jourEtHeure(Date.parse(début) + minutes * MS_PAR_MINUTE);
   return finale ? instantBruxelles(finale.day, finale.time) : null;
 }
 
