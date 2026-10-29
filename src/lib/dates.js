@@ -52,12 +52,12 @@ const écart = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`
  */
 export function formatPlage(de, à) {
   if (de === à) return formatJour(de);
-  const A = parties(de);
-  const B = parties(à);
+  const début = parties(de);
+  const fin = parties(à);
   const joint = écart(de, à) === 1 ? 'et' : 'au';
-  if (A.year !== B.year) return `${formatJour(de)} ${joint} ${formatJour(à)}`;
-  if (A.month !== B.month) return `${A.day} ${A.month} ${joint} ${B.day} ${B.month} ${B.year}`;
-  return `${A.day} ${joint} ${B.day} ${B.month} ${B.year}`;
+  if (début.year !== fin.year) return `${formatJour(de)} ${joint} ${formatJour(à)}`;
+  if (début.month !== fin.month) return `${début.day} ${début.month} ${joint} ${fin.day} ${fin.month} ${fin.year}`;
+  return `${début.day} ${joint} ${fin.day} ${fin.month} ${fin.year}`;
 }
 
 /**

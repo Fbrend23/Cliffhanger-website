@@ -139,14 +139,14 @@ function taillePortrait({ width, height }) {
  */
 async function heros(image, taille, { portrait = null, apercu = null } = {}) {
   const qualités = { qualité: QUALITÉ_PLEIN_ÉCRAN, avif: true };
-  const r = await réactive(image, taille, { largeurs: PLEIN_ÉCRAN, sizes: couvre(taille), ...qualités });
+  const paysage = await réactive(image, taille, { largeurs: PLEIN_ÉCRAN, sizes: couvre(taille), ...qualités });
   if (portrait && taille?.width && taille?.height) {
-    const tp = taillePortrait(taille);
-    const p = await réactive(portrait, tp, { largeurs: PORTRAIT_LARGEURS, sizes: couvre(PORTRAIT), ...qualités });
-    r.portrait = { srcset: p.srcset, avif: p.avif, sizes: p.sizes };
+    const tailleDuPortrait = taillePortrait(taille);
+    const version = await réactive(portrait, tailleDuPortrait, { largeurs: PORTRAIT_LARGEURS, sizes: couvre(PORTRAIT), ...qualités });
+    paysage.portrait = { srcset: version.srcset, avif: version.avif, sizes: version.sizes };
   }
-  r.apercu = apercu;
-  return r;
+  paysage.apercu = apercu;
+  return paysage;
 }
 
 /**
@@ -192,12 +192,12 @@ export const diapo = (image, taille) => réactive(image, taille, { largeurs: [70
  * @param {string|null} [apercu]
  */
 export async function vignetteGalerie(image, taille, apercu = null) {
-  const r = await réactive(image, taille, {
+  const vignette = await réactive(image, taille, {
     largeurs: [480, 800, 1200],
     sizes: '(max-width: 39em) calc(100vw - 2rem), (max-width: 60em) calc(50vw - 1.5rem), (max-width: 104em) calc(100vw / 3 - 2rem), 31.5rem',
   });
-  r.apercu = apercu;
-  return r;
+  vignette.apercu = apercu;
+  return vignette;
 }
 
 /**

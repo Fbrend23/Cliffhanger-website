@@ -157,8 +157,8 @@ async function afficheDuSpectacle(s, show, { cache, logger }) {
     return { poster: await assurerFichier(s.poster, cache, logger), posterTaille: await dimensionsFichier(s.poster, cache) };
   }
   if (!texte(show?.poster_url)) return { poster: null, posterTaille: null };
-  const a = await assurerFichierExterne(show.poster_url.trim(), idAfficheProdysos(show.slug), { cache, logger });
-  return { poster: a.chemin, posterTaille: { width: a.width, height: a.height } };
+  const affiche = await assurerFichierExterne(show.poster_url.trim(), idAfficheProdysos(show.slug), { cache, logger });
+  return { poster: affiche.chemin, posterTaille: { width: affiche.width, height: affiche.height } };
 }
 
 /**
@@ -613,11 +613,11 @@ export function montrealLoader() {
   return {
     name: 'directus-montreal',
     async load({ store, parseData, logger }) {
-      const m = (await request(`/items/${MONTREAL}?fields=sub,lead,text`)) ?? {};
-      signalerTirets(logger, 'page Montréal', [m.sub, m.lead, m.text]);
+      const page = (await request(`/items/${MONTREAL}?fields=sub,lead,text`)) ?? {};
+      signalerTirets(logger, 'page Montréal', [page.sub, page.lead, page.text]);
       store.clear();
-      const data = await parseData({ id: 'site', data: { sub: texte(m.sub), lead: texte(m.lead), text: texte(m.text) } });
-      store.set({ id: 'site', data, digest: JSON.stringify(m) });
+      const data = await parseData({ id: 'site', data: { sub: texte(page.sub), lead: texte(page.lead), text: texte(page.text) } });
+      store.set({ id: 'site', data, digest: JSON.stringify(page) });
     },
   };
 }

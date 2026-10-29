@@ -130,10 +130,10 @@ const bruxelles = new Intl.DateTimeFormat('en-CA', {
  * @param {string|number|null|undefined} horodatage  un nombre est un instant en millisecondes
  */
 export function jourEtHeure(horodatage) {
-  const d = new Date(horodatage ?? '');
-  if (Number.isNaN(d.getTime())) return null;
-  const p = Object.fromEntries(bruxelles.formatToParts(d).map((x) => [x.type, x.value]));
-  return { day: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+  const instant = new Date(horodatage ?? '');
+  if (Number.isNaN(instant.getTime())) return null;
+  const parties = Object.fromEntries(bruxelles.formatToParts(instant).map((partie) => [partie.type, partie.value]));
+  return { day: `${parties.year}-${parties.month}-${parties.day}`, time: `${parties.hour}:${parties.minute}` };
 }
 
 /**

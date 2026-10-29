@@ -32,6 +32,6 @@ export function retenirOrigine(destination, origine) {
 
 /** @param {string} destination @returns {Origine | null} */
 export function origineDe(destination) {
-  const o = lire()[destination];
-  return o && typeof o.chemin === 'string' && typeof o.nom === 'string' ? o : null;
+  const origine = lire()[destination];
+  return origine && typeof origine.chemin === 'string' && typeof origine.nom === 'string' ? origine : null;
 }
