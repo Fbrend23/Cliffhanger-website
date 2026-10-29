@@ -215,6 +215,57 @@ let lectureProdysos = null;
 
 
 /**
+ * Un spectacle prêt pour le store, ou null s'il manque son titre, son slug ou sa grande photo.
+ * @param {any} s  la ligne du CMS
+ * @param {{ slugsVus: Set<string>, deProdysos: Map<string, any>, cache: any, logger: any, parseData: Function }} contexte
+ */
+async function entréeSpectacle(s, { slugsVus, deProdysos, cache, logger, parseData }) {
+  const identité = identitéSpectacle(s, { logger, vus: slugsVus });
+  if (!identité) return null;
+  const { slug, title } = identité;
+  const show = deProdysos.get(slug);
+  const text = texte(s.text) ?? synopsisEnHtml(show?.synopsis);
+  signalerTirets(logger, `spectacle « ${title} »`, [s.title, s.punch, s.cite, text, s.credit, s.duration]);
+  const hero = await assurerFichier(s.hero, cache, logger);
+  const focal = pointFocal(s.hero);
+  // La grande photo couvre l'écran : son recadrage pour les téléphones
+  // tenus droits, et son aperçu flou (lib/directus.js).
+  const heroPortrait = await assurerPortrait(s.hero.id, focal, { cache, logger });
+  const heroApercu = await assurerAperçu(s.hero.id, cache);
+  const { poster, posterTaille } = await afficheDuSpectacle(s, show, { cache, logger });
+  const data = await parseData({
+    id: slug,
+    filePath: MANIFEST_REL,
+    data: {
+      slug,
+      title,
+      year: s.year ?? null,
+      troupe: troupeDe(s),
+      punch: texte(s.punch),
+      cite: texte(s.cite),
+      text,
+      credit: texte(s.credit),
+      duration: texte(s.duration),
+      sort: s.sort ?? 0,
+      hero,
+      heroTaille: await dimensionsFichier(s.hero, cache),
+      heroPortrait,
+      heroApercu,
+      focal,
+      poster,
+      posterTaille,
+      slides: idsDesDiapos(s.slides),
+    },
+  });
+  return {
+    id: slug,
+    data,
+    filePath: MANIFEST_REL,
+    digest: digestSpectacle(s, show),
+  };
+}
+
+/**
  * Les spectacles publiés, dans l'ordre du Studio, puis du plus récent.
  *
  * L'affiche et le texte du CMS font foi. Un spectacle qui n'en a pas prend
@@ -247,53 +298,11 @@ export function spectaclesLoader() {
       // téléchargements, deux spectacles jamais triés dans le Studio
       // changeaient de place d'un build à l'autre.
       const slugsVus = new Set();
-      const entrées = await mapLimit(lignes, 3, async (s) => {
-        const identité = identitéSpectacle(s, { logger, vus: slugsVus });
-        if (!identité) return null;
-        const { slug, title } = identité;
-        const show = deProdysos.get(slug);
-        const text = texte(s.text) ?? synopsisEnHtml(show?.synopsis);
-        signalerTirets(logger, `spectacle « ${title} »`, [s.title, s.punch, s.cite, text, s.credit, s.duration]);
-        const hero = await assurerFichier(s.hero, cache, logger);
-        const focal = pointFocal(s.hero);
-        // La grande photo couvre l'écran : son recadrage pour les téléphones
-        // tenus droits, et son aperçu flou (lib/directus.js).
-        const heroPortrait = await assurerPortrait(s.hero.id, focal, { cache, logger });
-        const heroApercu = await assurerAperçu(s.hero.id, cache);
-        const { poster, posterTaille } = await afficheDuSpectacle(s, show, { cache, logger });
-        const data = await parseData({
-          id: slug,
-          filePath: MANIFEST_REL,
-          data: {
-            slug,
-            title,
-            year: s.year ?? null,
-            troupe: troupeDe(s),
-            punch: texte(s.punch),
-            cite: texte(s.cite),
-            text,
-            credit: texte(s.credit),
-            duration: texte(s.duration),
-            sort: s.sort ?? 0,
-            hero,
-            heroTaille: await dimensionsFichier(s.hero, cache),
-            heroPortrait,
-            heroApercu,
-            focal,
-            poster,
-            posterTaille,
-            slides: idsDesDiapos(s.slides),
-          },
-        });
-        return {
-          id: slug,
-          data,
-          filePath: MANIFEST_REL,
-          digest: digestSpectacle(s, show),
-        };
-        // Le manifeste est enregistré même si un téléchargement échoue : sans
-        // lui, ce qui a déjà été téléchargé serait à refaire au build suivant.
-      }).finally(() => cache.enregistrer());
+      // Le manifeste est enregistré même si un téléchargement échoue : sans
+      // lui, ce qui a déjà été téléchargé serait à refaire au build suivant.
+      const entrées = await mapLimit(lignes, 3, (s) =>
+        entréeSpectacle(s, { slugsVus, deProdysos, cache, logger, parseData })
+      ).finally(() => cache.enregistrer());
 
       // La garde porte sur ce qui sera affiché, pas sur ce que le CMS a
       // rendu : des spectacles tous sans photo, ou seulement celui de
@@ -385,6 +394,40 @@ function représentationDuCms(r, { prixDe, logger }) {
 }
 
 /**
+ * Une photo prête pour le store : téléchargée, avec son recadrage portrait si elle sert de fond.
+ * @param {any} p  la ligne du CMS
+ * @param {{ fonds: Set<string>, cache: any, logger: any, parseData: Function }} contexte
+ */
+async function entréePhoto(p, { fonds, cache, logger, parseData }) {
+  if (!p.image?.id) {
+    logger.warn(`photo ${p.id} sans image : ignorée`);
+    return null;
+  }
+  const caption = légendeDePhoto(p);
+  signalerTirets(logger, `photo ${p.id}`, [caption]);
+  const id = String(p.id);
+  const image = await assurerFichier(p.image, cache, logger);
+  const focal = pointFocal(p.image);
+  const data = await parseData({
+    id,
+    filePath: MANIFEST_REL,
+    data: {
+      caption,
+      galerie: p.galerie === true,
+      spectacle: texte(p.spectacle?.slug),
+      sort: p.sort ?? 0,
+      image,
+      portrait: fonds.has(id) ? await assurerPortrait(p.image.id, focal, { cache, logger }) : null,
+      apercu: await assurerAperçu(p.image.id, cache),
+      ...(await dimensionsFichier(p.image, cache)),
+      focal,
+    },
+  });
+  // Devenir un fond (réglages) donne un portrait : ça compte dans le digest.
+  return { id, data, filePath: MANIFEST_REL, digest: JSON.stringify([p, p.image.modified_on, fonds.has(id)]) };
+}
+
+/**
  * La photothèque : galerie, carrousels, fonds de page, dans l'ordre du Studio.
  *
  * SEULES LES PHOTOS AFFICHÉES SONT CHARGÉES : celles de la galerie, des
@@ -414,42 +457,13 @@ export function photosLoader() {
       const réglages = await request(`/items/${REGLAGES}?fields=og_image,menu_video,menu_poster,${FONDS.join(',')}`);
       const { servies, fonds } = photosServies(autres, réglages);
 
-      let ignorées = 0;
       // Même règle que les spectacles : téléchargées en parallèle, rangées
-      // dans l'ordre du CMS.
-      const entrées = await mapLimit(photos, 3, async (p) => {
-        if (!p.galerie && !servies.has(String(p.id))) {
-          ignorées++;
-          return null;
-        }
-        if (!p.image?.id) {
-          logger.warn(`photo ${p.id} sans image : ignorée`);
-          return null;
-        }
-        const caption = légendeDePhoto(p);
-        signalerTirets(logger, `photo ${p.id}`, [caption]);
-        const id = String(p.id);
-        const image = await assurerFichier(p.image, cache, logger);
-        const focal = pointFocal(p.image);
-        const data = await parseData({
-          id,
-          filePath: MANIFEST_REL,
-          data: {
-            caption,
-            galerie: p.galerie === true,
-            spectacle: texte(p.spectacle?.slug),
-            sort: p.sort ?? 0,
-            image,
-            portrait: fonds.has(id) ? await assurerPortrait(p.image.id, focal, { cache, logger }) : null,
-            apercu: await assurerAperçu(p.image.id, cache),
-            ...(await dimensionsFichier(p.image, cache)),
-            focal,
-          },
-        });
-        // Devenir un fond (réglages) donne un portrait : ça compte dans le digest.
-        return { id, data, filePath: MANIFEST_REL, digest: JSON.stringify([p, p.image.modified_on, fonds.has(id)]) };
-        // Comme pour les spectacles : le manifeste survit à un téléchargement raté.
-      }).finally(() => cache.enregistrer());
+      // dans l'ordre du CMS ; le manifeste survit à un téléchargement raté.
+      const affichées = photos.filter((p) => p.galerie || servies.has(String(p.id)));
+      const ignorées = photos.length - affichées.length;
+      const entrées = await mapLimit(affichées, 3, (p) => entréePhoto(p, { fonds, cache, logger, parseData })).finally(() =>
+        cache.enregistrer()
+      );
       store.clear();
       for (const e of entrées) if (e) store.set(e);
 
@@ -648,6 +662,44 @@ export async function publierVidéoMenu(fichier, { cache, racine, logger }) {
   return `/media/${nom}`;
 }
 
+/** @param {any} v */
+const fond = (v) => (v == null ? null : String(typeof v === 'object' ? v.id : v));
+
+/**
+ * Les champs des réglages tels que le site les lit : textes nettoyés, fonds réduits à l'id de leur photo.
+ * @param {any} s  la ligne du CMS
+ * @param {{ og_image: string|null, menu_poster: string|null, menu_video: string|null }} fichiers
+ */
+function donnéesRéglages(s, { og_image, menu_poster, menu_video }) {
+  return {
+    site_title: texte(s.site_title),
+    site_description: texte(s.site_description),
+    email: texte(s.email),
+    instagram: texte(s.instagram),
+    facebook: texte(s.facebook),
+    compagnie_sub: texte(s.compagnie_sub),
+    compagnie_punch: texte(s.compagnie_punch),
+    compagnie_text: texte(s.compagnie_text),
+    fonds: {
+      accueil: fond(s.fond_accueil),
+      spectacles: fond(s.fond_spectacles),
+      agenda: fond(s.fond_agenda),
+      compagnie: fond(s.fond_compagnie),
+      contact: fond(s.fond_contact),
+    },
+    legal_denomination: texte(s.legal_denomination),
+    legal_adresse: texte(s.legal_adresse),
+    legal_bce: texte(s.legal_bce),
+    legal_rpm: texte(s.legal_rpm),
+    legal_responsable: texte(s.legal_responsable),
+    legal_conservation: texte(s.legal_conservation),
+    head_verification: texte(s.head_verification),
+    og_image,
+    menu_video,
+    menu_poster,
+  };
+}
+
 /**
  * Les réglages du site : un singleton, une seule entrée « site ».
  *
@@ -683,39 +735,11 @@ export function reglagesLoader() {
       const menu_video = await publierVidéoMenu(s.menu_video, { cache, racine: config.root, logger });
       await cache.enregistrer();
 
-      /** @param {any} v */
-      const fond = (v) => (v == null ? null : String(typeof v === 'object' ? v.id : v));
       store.clear();
       const data = await parseData({
         id: 'site',
         filePath: MANIFEST_REL,
-        data: {
-          site_title: texte(s.site_title),
-          site_description: texte(s.site_description),
-          email: texte(s.email),
-          instagram: texte(s.instagram),
-          facebook: texte(s.facebook),
-          compagnie_sub: texte(s.compagnie_sub),
-          compagnie_punch: texte(s.compagnie_punch),
-          compagnie_text: texte(s.compagnie_text),
-          fonds: {
-            accueil: fond(s.fond_accueil),
-            spectacles: fond(s.fond_spectacles),
-            agenda: fond(s.fond_agenda),
-            compagnie: fond(s.fond_compagnie),
-            contact: fond(s.fond_contact),
-          },
-          legal_denomination: texte(s.legal_denomination),
-          legal_adresse: texte(s.legal_adresse),
-          legal_bce: texte(s.legal_bce),
-          legal_rpm: texte(s.legal_rpm),
-          legal_responsable: texte(s.legal_responsable),
-          legal_conservation: texte(s.legal_conservation),
-          head_verification: texte(s.head_verification),
-          og_image,
-          menu_video,
-          menu_poster,
-        },
+        data: donnéesRéglages(s, { og_image, menu_poster, menu_video }),
       });
       store.set({ id: 'site', data, filePath: MANIFEST_REL, digest: JSON.stringify(s) });
       logger.info('réglages chargés');
