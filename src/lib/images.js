@@ -137,7 +137,7 @@ function taillePortrait({ width, height }) {
  * @param {{ portrait?: import('astro').ImageMetadata|null, apercu?: string|null }} [extras]
  * @returns {Promise<Réactive>}
  */
-export async function heros(image, taille, { portrait = null, apercu = null } = {}) {
+async function heros(image, taille, { portrait = null, apercu = null } = {}) {
   const qualités = { qualité: QUALITÉ_PLEIN_ÉCRAN, avif: true };
   const r = await réactive(image, taille, { largeurs: PLEIN_ÉCRAN, sizes: couvre(taille), ...qualités });
   if (portrait && taille?.width && taille?.height) {

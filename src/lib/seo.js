@@ -117,7 +117,7 @@ const instantBruxelles = (jour, heure) => `${jour}T${heure}:00${décalageBruxell
  * et le site à une seule compagnie.
  * @param {string} url  l'accueil
  */
-export const idCompagnie = (url) => `${url}#compagnie`;
+const idCompagnie = (url) => `${url}#compagnie`;
 
 /**
  * L'identifiant d'une personne : sa fiche.
