@@ -50,9 +50,11 @@ Toujours avec les vraies données du CMS (le `.env` du poste pointe dessus) :
 npm test                           # fonctions pures, loaders : sans CMS
 npm run check                      # astro check charge les collections
 npm run build && npm run preview
+npm run knip                       # code mort : exports, fichiers, dépendances
+npm run dupli                      # doublons de 50 jetons ou plus
 ```
 
-`npm run lint` : les seuils de complexité sont en avertissement pour le code existant, le code neuf les respecte ; Prettier (`npm run format`) seulement sur les fichiers qu'on touche. Le hook `.githooks/pre-commit` (gitleaks) refuse un secret ; ne jamais le contourner.
+`npm run lint` : complexité 10, imbrication 3, 3 paramètres et 50 lignes par fonction sont des erreurs (avertissements seulement dans `test/faux-directus/`) ; Prettier (`npm run format`) seulement sur les fichiers qu'on touche. Le hook `.githooks/pre-commit` (gitleaks) refuse un secret ; ne jamais le contourner.
 
 Le faux Directus (`node test/faux-directus/avec.mjs <commande>`) seulement si le vrai CMS est injoignable, et en le disant : il partage `.cache/directus-assets/` avec le vrai, et la purge du loader des photos efface alors tous les originaux du vrai CMS (le `npm run dev` suivant retélécharge tout, quelques minutes). Ne jamais envoyer le formulaire de réservation d'un build fait sur le vrai CMS : la demande part pour de vrai dans Prodysos.
 

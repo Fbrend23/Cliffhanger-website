@@ -107,15 +107,15 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [x] README d'exploitation à jour (déployer, secrets, contacts) · README : déployer, revenir en arrière, secrets, contact
 
 ## 13. Clean code (13)
-- [~] Noms explicites, 3 paramètres au plus · noms explicites en français ; paramètres non contrôlés
-- [~] Fonctions courtes à une seule responsabilité · non mesuré ; `Base.astro` porte beaucoup de script en ligne
-- [~] Retours anticipés, 3 niveaux d'imbrication au maximum · non contrôlé (aucune règle ESLint)
-- [~] Aucun nombre ou texte magique, constantes nommées · textes d'interface centralisés dans `textes.js` ; jetons dans `@theme` ; nombres non audités
-- [~] Commentaires = pourquoi, aucun code mort ni code commenté (knip) · commentaires qui disent le pourquoi (consigne du projet) ; knip absent
-- [~] Aucune erreur avalée, messages d'erreur avec contexte · warnings explicites dans les loaders et échecs de build parlants ; audit systématique des `catch` non fait
-- [ ] DRY à la troisième répétition (jscpd), sans abstraction prématurée · composants extraits (`Section`, `Accroche`, `TitrePage`…) ; jscpd absent
+- [x] Noms explicites, 3 paramètres au plus · noms entiers en français (les lettres seules ne restent que dans les boucles et les correspondances de regex) ; `max-params` à 3 en erreur (`npm run lint`)
+- [x] Fonctions courtes à une seule responsabilité · `max-lines-per-function` à 50 en erreur (`npm run lint`, CI) ; loaders et script de la galerie découpés
+- [x] Retours anticipés, 3 niveaux d'imbrication au maximum · `max-depth` à 3 et `complexity` à 10 en erreur (`npm run lint`, CI)
+- [x] Aucun nombre ou texte magique, constantes nommées · textes d'interface dans `textes.js` (aucun texte en dur dans les gabarits), jetons dans `@theme` ; délais, rejeux, troncatures et unités de temps nommés (`src/lib`, scripts de `Base.astro` et `Fond.astro`) ; codes HTTP laissés en clair
+- [x] Commentaires = pourquoi, aucun code mort ni code commenté (knip) · `npm run knip` sort à zéro (CI)
+- [x] Aucune erreur avalée, messages d'erreur avec contexte · chaque `catch` vide porte un commentaire qui dit pourquoi ; warnings explicites dans les loaders
+- [x] DRY à la troisième répétition (jscpd), sans abstraction prématurée · `npm run dupli` : aucun doublon de 50 jetons ou plus, `.astro` compris (CI) ; à 30 jetons, trois petits clones de balisage en deux exemplaires, laissés
 - [x] YAGNI : rien écrit pour plus tard, le plus simple qui marche · version anglaise et polices Adobe laissées au « Reste à faire »
-- [ ] Règles ESLint de complexité actives, appliquées par la CI · aucun ESLint
+- [x] Règles ESLint de complexité actives, appliquées par la CI · `eslint.config.js` : `complexity`, `max-depth`, `max-params`, `max-lines-per-function` en erreur, `check.yml` lance `npm run lint`
 
 ## Fait suite à cet audit (23.10.2026, sur `dev`, non poussé)
 `.node-version`, `.editorconfig`, fichiers cachés non servis (le manifeste de déploiement répondait 200 en ligne), `security.txt`,

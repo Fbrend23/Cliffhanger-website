@@ -85,6 +85,14 @@ jobs:
       - name: Contrôler le code
         run: npm run lint
 
+      # Le code mort (exports, fichiers, dépendances que rien n'utilise) et les doublons
+      # de plus de 50 jetons : les deux sortent à zéro, une régression arrête la vérification.
+      - name: Chercher le code mort
+        run: npm run knip
+
+      - name: Chercher les doublons
+        run: npm run dupli
+
       # Les fonctions pures (dates, générique, typographie, données
       # structurées) et les loaders contre le faux Directus : sans le CMS.
       - name: Tests unitaires
