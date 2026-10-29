@@ -25,6 +25,7 @@ export default [
       complexity: ['error', 10],
       'max-depth': ['error', 3],
       'max-params': ['error', 3],
+      'max-lines-per-function': ['error', { max: 50, skipBlankLines: true, skipComments: true }],
       'no-console': ['error', { allow: ['warn', 'error'] }],
       // Les objets du CMS sont typés `any` dans les composants, faute de type généré : à resserrer
       // quand les collections en fourniront un.
@@ -36,7 +37,7 @@ export default [
     // Le faux Directus des tests : un serveur de fabrication qui reproduit le filtrage du vrai, pas
     // du code du site. Ses seuils restent visibles sans arrêter la CI.
     files: ['test/faux-directus/**'],
-    rules: { complexity: ['warn', 10], 'max-depth': ['warn', 3], 'max-params': ['warn', 3] },
+    rules: { complexity: ['warn', 10], 'max-depth': ['warn', 3], 'max-params': ['warn', 3], 'max-lines-per-function': ['warn', 50] },
   },
   {
     // Des commandes : leur sortie est le message pour la personne qui les lance.
