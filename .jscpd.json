@@ -1,0 +1,10 @@
+{
+  "path": ["src", "scripts"],
+  "format": ["javascript", "markup"],
+  "formatsExts": { "markup": ["astro"] },
+  "minTokens": 50,
+  "minLines": 6,
+  "ignore": ["**/dist/**", "**/.astro/**", "**/.cache/**"],
+  "reporters": ["console"],
+  "exitCode": 1
+}
