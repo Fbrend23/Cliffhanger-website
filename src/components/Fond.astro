@@ -47,6 +47,11 @@ const figures = await Promise.all(
 </div>
 
 <script>
+  // Les photos de survol attendent le repos du navigateur, au plus ce délai, ou ce repli s'il n'a pas
+  // requestIdleCallback (ms).
+  const REPOS_MAX_MS = 2500;
+  const REPLI_REPOS_MS = 1200;
+
   // Poser les srcset gardés en attente : le navigateur choisit alors sa
   // source et sa taille. Les <source> d'abord, sinon l'<img> partirait en
   // WebP. En priorité basse : même au survol, la photo de fond passe d'abord.
@@ -76,7 +81,7 @@ const figures = await Promise.all(
     // photo de fond soit arrivée, et quatre photos de survol lui disputaient
     // alors le débit. On attend donc qu'elle soit chargée.
     const tout = () => figures.forEach((f) => f.querySelectorAll<HTMLImageElement>('img[data-srcset]').forEach(charger));
-    const auRepos = () => ('requestIdleCallback' in window ? requestIdleCallback(tout, { timeout: 2500 }) : setTimeout(tout, 1200));
+    const auRepos = () => ('requestIdleCallback' in window ? requestIdleCallback(tout, { timeout: REPOS_MAX_MS }) : setTimeout(tout, REPLI_REPOS_MS));
     const fond = document.querySelector<HTMLImageElement>('[data-fond] img');
     if (!économe()) {
       if (!fond || fond.complete) auRepos();

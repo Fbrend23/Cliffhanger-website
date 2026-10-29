@@ -277,6 +277,12 @@ const entrée =
     </script>
 
     <script>
+      // Délais (ms). Sans requestIdleCallback, on attend ce repli avant le travail différé ; le menu fermé
+      // garde sa vidéo le temps de son fondu ; la barre de chargement ne s'allume que si la page se fait attendre.
+      const REPLI_REPOS_MS = 1000;
+      const ARRÊT_VIDÉO_MENU_MS = 300;
+      const DÉLAI_BARRE_CHARGEMENT_MS = 150;
+
       // Les comportements communs à toutes les pages. Ce module ne s'exécute
       // qu'une fois (le routeur ne recharge pas la page) : ce qui dépend de la
       // page en cours se relance sur `astro:page-load`, le reste passe par des
@@ -312,7 +318,7 @@ const entrée =
         const permis = !sobre() && (approche || connexion()?.effectiveType === '4g');
         if (permis && vidéo.preload !== 'auto') vidéo.preload = 'auto';
       }
-      const auRepos = (f: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(f) : setTimeout(f, 1000));
+      const auRepos = (f: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(f) : setTimeout(f, REPLI_REPOS_MS));
       const auReposMenu = () => auRepos(() => préparerMenu(false));
       if (document.readyState === 'complete') auReposMenu();
       else addEventListener('load', auReposMenu, { once: true });
@@ -338,7 +344,7 @@ const entrée =
         } else {
           setTimeout(() => {
             if (!document.body.classList.contains('menu-open')) vidéo.pause();
-          }, 300);
+          }, ARRÊT_VIDÉO_MENU_MS);
         }
       }
       const menuOuvert = () => document.body.classList.contains('menu-open');
@@ -567,7 +573,7 @@ const entrée =
           cliqué.setAttribute('data-en-cours', '');
         }
         document.querySelector('main')?.setAttribute('aria-busy', 'true');
-        attente = window.setTimeout(() => document.querySelector('.js-chargement')?.setAttribute('data-actif', ''), 150);
+        attente = window.setTimeout(() => document.querySelector('.js-chargement')?.setAttribute('data-actif', ''), DÉLAI_BARRE_CHARGEMENT_MS);
         // Un second clic annule le premier : sa fin éteint ce qui restait allumé.
         e.signal.addEventListener('abort', finirAttente, { once: true });
       });
