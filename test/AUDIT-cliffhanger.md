@@ -77,11 +77,11 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [x] `aria-expanded` / `aria-current` / `aria-pressed` / `aria-live` bien posés · burger, menu, légende de la visionneuse, statut du formulaire (`aria-pressed` sans objet)
 - [x] `prefers-reduced-motion` géré (CSS et JS) · `site.css`, `Base.astro`, `Carrousel.astro`
 - [x] Fonctionne sans JavaScript · variante `sans-js:`, menu en ligne de liens, formulaire remplacé par l'e-mail
-- [~] Contrastes, textes alternatifs, labels de formulaire · labels du formulaire en place ; contrastes sur photos et texte à 60 à 75 % d'opacité non mesurés
+- [~] Contrastes, textes alternatifs, labels de formulaire · 30.10.2026, build sur le vrai CMS : axe-core (WCAG 2.1 AA) sans violation sur 13 pages (une par gabarit) à 390, 820 et 1440 px, alt et labels compris ; les ~150 textes qu'axe ne tranche pas (blanc à 60 à 75 % d'opacité sur photo) mesurés au pixel, fond capturé texte masqué. Voile du haut des héros porté à 0,7 et pied de page à 90 % d'opacité après mesure. Reste sous le seuil au 5e centile des pixels les plus clairs seulement : logo et « Menu » de `/compagnie/` à 390 px (3,8 pour 4,5), pied de page de `/agenda/` à 1440 px (4,2 pour 4,5), titres de l'accueil à 820 px (2,86 pour 3), phrase de la 404 (4,46 pour 4,5). Les médianes sont toutes au-dessus des seuils. Les pastilles de `/contact/` et de la 404 (bordure blanche) et « Découvrir » (mesuré en plein fondu) sont des artefacts de la mesure
 - [~] Cibles cliquables d'au moins 24x24 px (44x44 sur mobile) · bouton du menu à 44 px de haut ; autres liens non mesurés
 - [x] Zoom non bloqué, `color-scheme` si mode sombre · viewport sans `maximum-scale` ; `color-scheme: dark`
 - [~] Test à 390, 820 et 1440 px · consigne du projet, suivie à chaque changement visuel ; non consigné
-- [ ] axe ou Lighthouse sans erreur grave, test lecteur d'écran · non fait
+- [~] axe ou Lighthouse sans erreur grave, test lecteur d'écran · axe-core sans violation (voir ci-dessus) ; test au lecteur d'écran non fait
 
 ## 11. SEO (11)
 - [x] Contenu présent dans le HTML sans JavaScript · site statique
@@ -92,7 +92,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [x] `sitemap.xml` et `robots.txt` (généré depuis `SITE_URL`) · `@astrojs/sitemap` et `robots.txt.js`
 - [x] 404 et pages utilitaires en `noindex`, anciennes URL en 301 côté serveur · 404 en `noindex` sans canonical ; 301 http/www vers le domaine unique ; aucune ancienne adresse listée, redirections du prototype non vérifiées
 - [x] Un seul domaine canonique en HTTPS · `.htaccess` et `SITE_URL`
-- [~] Pack de favicons complet (ico, svg, apple-touch-icon, manifeste) · `favicon.png` et `apple-touch-icon.png` ; ni `.ico`, ni SVG, ni manifeste
+- [x] Pack de favicons complet (ico, svg, apple-touch-icon, manifeste) · `favicon.ico`, `favicon.png`, `apple-touch-icon.png`, `icone-192.png`, `icone-384.png` et `site.webmanifest`, déclarés dans `Base.astro` ; pas de SVG, le logo n'existe qu'en raster (décision du 30.10.2026)
 - [ ] Search Console vérifié, sitemap envoyé · champ `head_verification` prévu dans les réglages ; état à confirmer
 - [ ] Lighthouse SEO à 100 · non mesuré
 

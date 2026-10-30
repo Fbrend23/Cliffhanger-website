@@ -90,7 +90,7 @@ Type : Site statique. Générée le 23.10.2026.
 - [x] `sitemap.xml` et `robots.txt` (généré depuis `SITE_URL`)
 - [x] 404 et pages utilitaires en `noindex`, anciennes URL en 301 côté serveur
 - [x] Un seul domaine canonique en HTTPS
-- [ ] Pack de favicons complet (ico, svg, apple-touch-icon, manifeste)
+- [x] Pack de favicons complet (ico, svg, apple-touch-icon, manifeste)
 - [ ] Search Console vérifié, sitemap envoyé
 - [ ] Lighthouse SEO à 100
 
