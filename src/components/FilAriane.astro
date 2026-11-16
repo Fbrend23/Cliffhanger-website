@@ -17,7 +17,7 @@ const { chemin } = Astro.props;
       <li class="flex gap-x-2">
         {i > 0 && <span aria-hidden="true">›</span>}
         {é.href ? (
-          <a class="lien-souligne inline-flex min-h-6 items-center tactile:min-h-11" href={é.href} set:html={tx(é.nom)} />
+          <a class="lien-souligne relative after:absolute after:inset-x-0 after:-inset-y-1 tactile:after:-inset-y-3.5" href={é.href} set:html={tx(é.nom)} />
         ) : (
           <span aria-current="page" set:html={tx(é.nom)} />
         )}
