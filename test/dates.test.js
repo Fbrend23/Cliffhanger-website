@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { INSÉCABLE } from '../src/lib/typo.js';
 import { aujourdhui, formatHeure, formatJour, formatJourHeure, formatPlage, formatPrix, lieu, séries } from '../src/lib/dates.js';
 
 test('un prix : le nombre seul prend son €, le texte reste', () => {
-  assert.equal(formatPrix('6,07'), '6,07 €');
-  assert.equal(formatPrix(' 12 '), '12 €');
-  assert.equal(formatPrix('12 €'), '12 €');
+  assert.equal(formatPrix('6,07'), `6,07${INSÉCABLE}€`);
+  assert.equal(formatPrix(' 12 '), `12${INSÉCABLE}€`);
+  assert.equal(formatPrix('12 €'), `12${INSÉCABLE}€`);
   assert.equal(formatPrix('prix libre'), 'prix libre');
   assert.equal(formatPrix(null), '');
 });
@@ -28,8 +29,8 @@ test('les plages du prototype', () => {
 });
 
 test('séries : soirs consécutifs d’un spectacle dans une salle, les plus récentes d’abord', () => {
-  const r = (spectacle, day, venue = 'Salle', city = 'Forest') => ({ spectacle, day, venue, city });
-  const s = séries([r('a', '2024-05-24'), r('a', '2024-05-26'), r('a', '2024-05-25'), r('b', '2026-04-17'), r('b', '2026-04-18'), r('b', '2026-05-01'), r('a', '2024-05-27', 'Autre')]);
+  const r = (spectacle, day, { venue = 'Salle', city = 'Forest' } = {}) => ({ spectacle, day, venue, city });
+  const s = séries([r('a', '2024-05-24'), r('a', '2024-05-26'), r('a', '2024-05-25'), r('b', '2026-04-17'), r('b', '2026-04-18'), r('b', '2026-05-01'), r('a', '2024-05-27', { venue: 'Autre' })]);
   assert.deepEqual(s, [
     { spectacle: 'b', de: '2026-05-01', à: '2026-05-01', lieu: 'Salle, Forest' },
     { spectacle: 'b', de: '2026-04-17', à: '2026-04-18', lieu: 'Salle, Forest' },

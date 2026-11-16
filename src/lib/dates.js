@@ -6,6 +6,8 @@
 // écrivent le même jour. Seule « aujourd'hui » dépend du fuseau, et c'est
 // celui de Bruxelles, où les représentations ont lieu.
 
+import { INSÉCABLE } from './typo.js';
+
 const formatJourMois = new Intl.DateTimeFormat('fr-BE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
 /** @param {string} iso */
@@ -20,11 +22,14 @@ export function formatJour(iso) {
   return `${p.day} ${p.month} ${p.year}`;
 }
 
+// « 20:00:00 » → « 20:00 ».
+const LONGUEUR_HEURE_MINUTES = 5;
+
 /**
  * « 20:00 » ou « 20:00:00 » → « 20h00 ». Vide, rien.
  * @param {string|null|undefined} t
  */
-export const formatHeure = (t) => (t ? t.slice(0, 5).replace(':', 'h') : '');
+export const formatHeure = (t) => (t ? t.slice(0, LONGUEUR_HEURE_MINUTES).replace(':', 'h') : '');
 
 /**
  * Le jour et l'heure d'une représentation : « 17 avr. 2026, 20h00 ».
@@ -49,12 +54,12 @@ const écart = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`
  */
 export function formatPlage(de, à) {
   if (de === à) return formatJour(de);
-  const A = parties(de);
-  const B = parties(à);
+  const début = parties(de);
+  const fin = parties(à);
   const joint = écart(de, à) === 1 ? 'et' : 'au';
-  if (A.year !== B.year) return `${formatJour(de)} ${joint} ${formatJour(à)}`;
-  if (A.month !== B.month) return `${A.day} ${A.month} ${joint} ${B.day} ${B.month} ${B.year}`;
-  return `${A.day} ${joint} ${B.day} ${B.month} ${B.year}`;
+  if (début.year !== fin.year) return `${formatJour(de)} ${joint} ${formatJour(à)}`;
+  if (début.month !== fin.month) return `${début.day} ${début.month} ${joint} ${fin.day} ${fin.month} ${fin.year}`;
+  return `${début.day} ${joint} ${fin.day} ${fin.month} ${fin.year}`;
 }
 
 /**
@@ -67,11 +72,13 @@ export const lieu = (r) => [r.venue, r.city].filter(Boolean).join(', ');
  * Le prix tel qu'on le lit : un nombre seul (« 6,07 ») prend son « € », un
  * texte (« 12 € », « prix libre ») reste tel quel. Le même prix nourrit la
  * page et les données structurées (`prixEnEuros`), qui exigent le « € ».
+ * L'espace est insécable : dans une cellule étroite, le « € » ne reste pas seul sur la ligne suivante.
  * @param {string|null|undefined} prix
  */
 export function formatPrix(prix) {
   const p = (prix ?? '').trim();
-  return /^\d+(?:[.,]\d{1,2})?$/.test(p) ? `${p} €` : p;
+  const avecEuro = /^\d+(?:[.,]\d{1,2})?$/.test(p) ? `${p} €` : p;
+  return avecEuro.replace(/(\d) €/g, `$1${INSÉCABLE}€`);
 }
 
 /**

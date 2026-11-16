@@ -23,6 +23,7 @@ import { access, mkdir, readFile, readdir, rename, unlink, writeFile } from 'nod
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { messageDe } from './erreurs.js';
 
 /**
  * Le dossier du cache, RELATIF à la racine du projet et en séparateurs posix :
@@ -43,7 +44,17 @@ export const MANIFEST_REL = `${CACHE_REL}/manifest.json`;
  * dont le site n'a pas l'usage (platform-cms, scripts/lib/permissions.mjs).
  * En demander un qui n'y est pas fait échouer la requête.
  */
-export const CHAMPS_FICHIER = ['id', 'filename_download', 'type', 'width', 'height', 'modified_on', 'title', 'focal_point_x', 'focal_point_y'];
+export const CHAMPS_FICHIER = [
+  'id',
+  'filename_download',
+  'type',
+  'width',
+  'height',
+  'modified_on',
+  'title',
+  'focal_point_x',
+  'focal_point_y',
+];
 
 /**
  * `hero.id,hero.type,…` : les mêmes champs, préfixés pour une relation.
@@ -58,48 +69,65 @@ export const champsFichier = (relation) => CHAMPS_FICHIER.map((c) => `${relation
 // Un 5xx ou une coupure réseau (fréquents sur un hébergement mutualisé) se
 // rejouent aussi, deux fois, et une connexion figée s'arrête au bout de 30 s :
 // sans délai, elle tiendrait le déploiement de nuit jusqu'aux 20 min du job.
+// Le délai court l'échange entier, corps compris : un original de 15 Mo sur une
+// liaison lente ne tient pas en 30 s, d'où `fichier` pour les téléchargements, y compris
+// l'affiche de Prodysos, qui ne vient pas de Directus mais gèlerait le build de la même façon.
 // Un objet exporté, pour que les tests réduisent les attentes.
-export const DÉLAIS = { panne: [2000, 5000], max: 30_000 };
+export const DÉLAIS = { panne: [2000, 5000], max: 30_000, fichier: 120_000 };
+
+// Rejeux après un 429 avant d'abandonner, et marge ajoutée à ce que demande `Retry-After`.
+const MAX_REJEUX_LIMITE = 5;
+const MARGE_RETRY_AFTER_MS = 50;
+const MS_PAR_SECONDE = 1000;
 
 /** @param {number} ms */
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Que faire d'une réponse : la rendre (`ok`), attendre ce que demande le serveur (`limite`),
+ * rejouer après une panne (`panne`), ou renoncer (`refus`).
+ * @param {Response} res
+ * @param {number} limites  rejeux faits après un 429
+ * @param {number} pannes   rejeux faits après un 5xx ou une coupure
+ * @returns {'ok' | 'limite' | 'panne' | 'refus'}
+ */
+function verdict(res, limites, pannes) {
+  if (res.status === 429 && limites < MAX_REJEUX_LIMITE) return 'limite';
+  if (res.status >= 500 && pannes < DÉLAIS.panne.length) return 'panne';
+  return res.ok ? 'ok' : 'refus';
+}
+
+/**
  * @param {string} url
- * @param {number} [tentative]  rejeux faits après un 429
- * @param {number} [pannes]     rejeux faits après un 5xx ou une coupure
+ * @param {number} [délai]  durée maximale de l'échange, corps compris
  * @returns {Promise<Response>}
  */
-async function appeler(url, tentative = 0, pannes = 0) {
+async function appeler(url, délai = DÉLAIS.max) {
   const adresse = url.replace(DIRECTUS_URL, '');
-  let res;
-  try {
-    res = await fetch(url, { headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` }, signal: AbortSignal.timeout(DÉLAIS.max) });
-  } catch (e) {
-    if (pannes < DÉLAIS.panne.length) {
-      await attendre(DÉLAIS.panne[pannes]);
-      return appeler(url, tentative, pannes + 1);
+  const headers = { Authorization: `Bearer ${DIRECTUS_TOKEN}` };
+  let limites = 0;
+  let pannes = 0;
+
+  for (;;) {
+    let res;
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(délai) });
+    } catch (e) {
+      if (pannes >= DÉLAIS.panne.length) throw new Error(`CMS injoignable (${adresse}) : ${messageDe(e)}`, { cause: e });
+      await attendre(DÉLAIS.panne[pannes++]);
+      continue;
     }
-    throw new Error(`CMS injoignable (${adresse}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
-  }
 
-  if (res.status === 429 && tentative < 5) {
-    const secondes = Number(res.headers.get('retry-after')) || 1;
-    await attendre(secondes * 1000 + 50);
-    return appeler(url, tentative + 1, pannes);
+    const suite = verdict(res, limites, pannes);
+    if (suite === 'ok') return res;
+    if (suite === 'refus') throw new Error(`CMS ${adresse} : HTTP ${res.status} ${await res.text().catch(() => '')}`.trim());
+    if (suite === 'limite') {
+      limites++;
+      await attendre((Number(res.headers.get('retry-after')) || 1) * MS_PAR_SECONDE + MARGE_RETRY_AFTER_MS);
+    } else {
+      await attendre(DÉLAIS.panne[pannes++]);
+    }
   }
-
-  if (res.status >= 500 && pannes < DÉLAIS.panne.length) {
-    await attendre(DÉLAIS.panne[pannes]);
-    return appeler(url, tentative, pannes + 1);
-  }
-
-  if (!res.ok) {
-    const détail = await res.text().catch(() => '');
-    throw new Error(`CMS ${adresse} : HTTP ${res.status} ${détail}`.trim());
-  }
-
-  return res;
 }
 
 /**
@@ -142,7 +170,11 @@ export async function requestAll(chemin) {
 // --- Le cache des originaux --------------------------------------------------
 
 /** @param {string} chemin */
-const existe = (chemin) => access(chemin).then(() => true, () => false);
+const existe = (chemin) =>
+  access(chemin).then(
+    () => true,
+    () => false
+  );
 
 /** @typedef {{ modified_on: string, fichier: string, aperçu?: string, portrait?: { focal: string, fichier: string } }} Entrée */
 /** @typedef {{ dossier: string, manifest: Record<string, Entrée>, enregistrer(): Promise<void> }} Cache */
@@ -244,14 +276,11 @@ export async function purgerCache(cache, garder) {
  * @param {{ info(msg:string):void }} logger
  */
 export async function assurerFichier(fichier, cache, logger) {
-  const ext = (
-    path.extname(fichier.filename_download ?? '').slice(1) ||
-    fichier.type?.split('/')[1] ||
-    'jpg'
-  ).toLowerCase();
+  const ext = (path.extname(fichier.filename_download ?? '').slice(1) || fichier.type?.split('/')[1] || 'jpg').toLowerCase();
   const nom = `${fichier.id}.${ext}`;
-  await ranger(cache, fichier.id, nom, fichier.modified_on ?? '', logger, fichier.filename_download ?? fichier.id, () =>
-    appeler(`${DIRECTUS_URL}/assets/${fichier.id}`)
+  const libellé = fichier.filename_download ?? fichier.id;
+  await ranger({ cache, logger, id: fichier.id, nom, version: fichier.modified_on ?? '', libellé }, () =>
+    appeler(`${DIRECTUS_URL}/assets/${fichier.id}`, DÉLAIS.fichier)
   );
   return `./${nom}`;
 }
@@ -286,19 +315,18 @@ export async function dimensionsFichier(fichier, cache) {
  *
  * @param {string} url
  * @param {string} id  sans point (voir purgerCache)
- * @param {Cache} cache
- * @param {{ info(msg:string):void }} logger
+ * @param {{ cache: Cache, logger: { info(msg:string):void } }} contexte
  * @returns {Promise<{ chemin: string, width: number|null, height: number|null }>}
  */
-export async function assurerFichierExterne(url, id, cache, logger) {
+export async function assurerFichierExterne(url, id, { cache, logger }) {
   const ext = (path.extname(new URL(url).pathname).slice(1) || 'jpg').toLowerCase();
   const nom = `${id}.${ext}`;
-  await ranger(cache, id, nom, url, logger, url, async () => {
+  await ranger({ cache, logger, id, nom, version: url, libellé: url }, async () => {
     let res;
     try {
-      res = await fetch(url);
+      res = await fetch(url, { signal: AbortSignal.timeout(DÉLAIS.fichier) });
     } catch (e) {
-      throw new Error(`Image injoignable (${url}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+      throw new Error(`Image injoignable (${url}) : ${messageDe(e)}`, { cause: e });
     }
     if (!res.ok) throw new Error(`Image ${url} : HTTP ${res.status}`);
     return res;
@@ -315,15 +343,16 @@ export async function assurerFichierExterne(url, id, cache, logger) {
  * L'écriture passe par un `.part` renommé à la fin : un build interrompu ne
  * laisse jamais un fichier à moitié écrit que le suivant croirait complet.
  *
- * @param {Cache} cache
- * @param {string} id  la clé du manifeste, et le début du nom
- * @param {string} nom  `<id>.<ext>`
- * @param {string} version  ce qui change quand le fichier change
- * @param {{ info(msg:string):void }} logger
- * @param {string} libellé  pour le log
+ * @param {object} fichier
+ * @param {Cache} fichier.cache
+ * @param {{ info(msg:string):void }} fichier.logger
+ * @param {string} fichier.id  la clé du manifeste, et le début du nom
+ * @param {string} fichier.nom  `<id>.<ext>`
+ * @param {string} fichier.version  ce qui change quand le fichier change
+ * @param {string} fichier.libellé  pour le log
  * @param {() => Promise<Response>} charger
  */
-async function ranger(cache, id, nom, version, logger, libellé, charger) {
+async function ranger({ cache, logger, id, nom, version, libellé }, charger) {
   const cible = path.join(cache.dossier, nom);
   const connu = cache.manifest[id];
   if (connu?.modified_on === version && connu.fichier === nom && (await existe(cible))) return;
@@ -357,6 +386,9 @@ const enCours = new Map();
 // en base64 dans la page. Le flou est cuit dedans : agrandi cent fois par le
 // navigateur, un aperçu net montrerait ses blocs.
 const APERÇU_LARGEUR = 32;
+// Assez flou et léger pour tenir dans la page (data: URI) sans qu'on y reconnaisse un défaut de la photo.
+const APERÇU_FLOU = 0.8;
+const APERÇU_QUALITÉ = 45;
 
 /**
  * L'aperçu flou d'un fichier du cache, en `data:` URI, posé sous la photo le
@@ -381,8 +413,8 @@ export async function assurerAperçu(id, cache) {
     const buf = await sharp(await readFile(path.join(cache.dossier, entrée.fichier)))
       .rotate()
       .resize(APERÇU_LARGEUR, APERÇU_LARGEUR, { fit: 'inside' })
-      .blur(0.8)
-      .webp({ quality: 45 })
+      .blur(APERÇU_FLOU)
+      .webp({ quality: APERÇU_QUALITÉ })
       .toBuffer();
     entrée.aperçu = `data:image/webp;base64,${buf.toString('base64')}`;
   }
@@ -393,6 +425,8 @@ export async function assurerAperçu(id, cache) {
 // sur les récents), le navigateur rogne encore un peu les côtés avec
 // `object-fit: cover` ; plus large (une tablette), un peu le haut et le bas.
 export const PORTRAIT = 9 / 16;
+/** Le centre de la photo, en %, quand le Studio n'a posé aucun point focal. */
+const FOCAL_CENTRE = 50;
 
 /**
  * Le cadre 9:16 d'une image de W × H autour de son point focal. Même règle
@@ -407,8 +441,8 @@ export const PORTRAIT = 9 / 16;
  * @returns {{ left: number, top: number, width: number, height: number }}
  */
 export function cadrePortrait(W, H, focal) {
-  const x = (focal?.x ?? 50) / 100;
-  const y = (focal?.y ?? 50) / 100;
+  const x = (focal?.x ?? FOCAL_CENTRE) / 100;
+  const y = (focal?.y ?? FOCAL_CENTRE) / 100;
   const width = W / H > PORTRAIT ? Math.round(H * PORTRAIT) : W;
   const height = W / H > PORTRAIT ? H : Math.round(W / PORTRAIT);
   return { left: Math.round((W - width) * x), top: Math.round((H - height) * y), width, height };
@@ -430,11 +464,10 @@ export function cadrePortrait(W, H, focal) {
  *
  * @param {string} id  la clé du manifeste
  * @param {{x:number, y:number}|null} focal
- * @param {Cache} cache
- * @param {{ info(msg:string):void }} logger
+ * @param {{ cache: Cache, logger: { info(msg:string):void } }} contexte
  * @returns {Promise<string>}  le chemin relatif au manifeste, comme `assurerFichier`
  */
-export async function assurerPortrait(id, focal, cache, logger) {
+export async function assurerPortrait(id, focal, { cache, logger }) {
   const entrée = cache.manifest[id];
   if (!entrée) throw new Error(`portrait demandé pour ${id} avant son téléchargement`);
   const clé = focal ? `${focal.x},${focal.y}` : 'centre';
@@ -455,7 +488,10 @@ export async function assurerPortrait(id, focal, cache, logger) {
       const méta = await original.metadata();
       const { width: W, height: H } = méta.autoOrient ?? méta;
       const tmp = `${cible}.part`;
-      await original.extract(cadrePortrait(W, H, focal)).webp({ quality: 92 }).toFile(tmp);
+      await original
+        .extract(cadrePortrait(W, H, focal))
+        .webp({ quality: 92 })
+        .toFile(tmp);
       await rename(tmp, cible);
       entrée.portrait = { focal: clé, fichier: nom };
     })().finally(() => enCours.delete(tâche));

@@ -7,6 +7,9 @@
 import { jourEtHeure } from './prodysos.js';
 import { formatPrix } from './dates.js';
 
+const MINUTES_PAR_HEURE = 60;
+const MS_PAR_MINUTE = 60_000;
+
 /** @type {Record<string, string>} */
 const ENTITÉS = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
@@ -99,7 +102,7 @@ export function filAriane(étapes) {
  */
 export function duréeEnMinutes(durée) {
   const h = /(\d+)\s*h(?:\s*(\d{1,2}))?/i.exec(durée ?? '');
-  if (h) return Number(h[1]) * 60 + Number(h[2] ?? 0);
+  if (h) return Number(h[1]) * MINUTES_PAR_HEURE + Number(h[2] ?? 0);
   const m = /(\d+)\s*min/i.exec(durée ?? '');
   return m ? Number(m[1]) : null;
 }
@@ -117,13 +120,20 @@ const instantBruxelles = (jour, heure) => `${jour}T${heure}:00${décalageBruxell
  * et le site à une seule compagnie.
  * @param {string} url  l'accueil
  */
-export const idCompagnie = (url) => `${url}#compagnie`;
+const idCompagnie = (url) => `${url}#compagnie`;
 
 /**
  * L'identifiant d'une personne : sa fiche.
  * @param {string} url
  */
 const idPersonne = (url) => `${url}#personne`;
+
+/**
+ * L'objet sans ses propriétés vides (absentes, vides, fausses, tableaux vides) :
+ * schema.org préfère une propriété omise à une propriété vide.
+ * @param {Record<string, unknown>} o
+ */
+const sansVides = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => (Array.isArray(v) ? v.length : !!v)));
 
 /**
  * Le site : c'est lui qui donne son nom au site dans les résultats de Google.
@@ -139,20 +149,32 @@ export function siteWeb({ nom, url }) {
  * @param {{ nom: string, url: string, description?: string|null, email?: string|null, réseaux?: (string|null)[], image?: string|null, logo?: string|null, membres?: { nom: string, url: string }[] }} o
  */
 export function organisation({ nom, url, description = null, email = null, réseaux = [], image = null, logo = null, membres = [] }) {
-  const liens = réseaux.filter(Boolean);
-  return {
+  return sansVides({
     '@type': 'TheaterGroup',
     '@id': idCompagnie(url),
     name: nom,
     url,
-    ...(description ? { description } : {}),
-    ...(email ? { email } : {}),
-    ...(logo ? { logo } : {}),
-    ...(image ? { image } : {}),
-    ...(liens.length ? { sameAs: liens } : {}),
+    description,
+    email,
+    logo,
+    image,
+    sameAs: réseaux.filter(Boolean),
     address: { '@type': 'PostalAddress', addressLocality: 'Bruxelles', addressCountry: 'BE' },
-    ...(membres.length ? { member: membres.map((m) => ({ '@type': 'Person', '@id': idPersonne(m.url), name: m.nom, url: m.url })) } : {}),
-  };
+    member: membres.map((m) => ({ '@type': 'Person', '@id': idPersonne(m.url), name: m.nom, url: m.url })),
+  });
+}
+
+/**
+ * La fin d'une représentation, quand l'heure de début et la durée se lisent.
+ * @param {{ duration?: string|null }} spectacle
+ * @param {{ time: string|null }} r
+ * @param {string} début
+ */
+function fin(spectacle, r, début) {
+  const minutes = r.time ? duréeEnMinutes(spectacle.duration) : null;
+  if (!minutes) return null;
+  const finale = jourEtHeure(Date.parse(début) + minutes * MS_PAR_MINUTE);
+  return finale ? instantBruxelles(finale.day, finale.time) : null;
 }
 
 /**
@@ -167,35 +189,23 @@ export function organisation({ nom, url, description = null, email = null, rése
 export function theaterEvent(spectacle, r, { url, image = null, organisateur, réservable = false }) {
   if (!r.venue && !r.city) return null;
   const début = r.time ? instantBruxelles(r.day, r.time) : r.day;
-  const minutes = r.time ? duréeEnMinutes(spectacle.duration) : null;
-  const finale = minutes ? jourEtHeure(Date.parse(début) + minutes * 60_000) : null;
   const prix = prixEnEuros(r.price);
   const compagnie = { '@type': 'TheaterGroup', '@id': idCompagnie(organisateur.url), name: organisateur.nom, url: organisateur.url };
-  return {
+  const adresse = sansVides({ '@type': 'PostalAddress', streetAddress: r.street, postalCode: r.postalCode, addressLocality: r.city, addressCountry: 'BE' });
+  const offre = prix && sansVides({ '@type': 'Offer', price: prix, priceCurrency: 'EUR', url, availability: réservable && 'https://schema.org/InStock' });
+  return sansVides({
     '@type': 'TheaterEvent',
     name: spectacle.title,
     startDate: début,
-    ...(finale ? { endDate: instantBruxelles(finale.day, finale.time) } : {}),
+    endDate: fin(spectacle, r, début),
     eventStatus: 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     url,
-    ...(spectacle.punch ? { description: spectacle.punch } : {}),
-    ...(image ? { image } : {}),
-    location: {
-      '@type': 'Place',
-      name: r.venue ?? r.city,
-      address: {
-        '@type': 'PostalAddress',
-        ...(r.street ? { streetAddress: r.street } : {}),
-        ...(r.postalCode ? { postalCode: r.postalCode } : {}),
-        ...(r.city ? { addressLocality: r.city } : {}),
-        addressCountry: 'BE',
-      },
-    },
-    ...(prix
-      ? { offers: { '@type': 'Offer', price: prix, priceCurrency: 'EUR', url, ...(réservable ? { availability: 'https://schema.org/InStock' } : {}) } }
-      : {}),
+    description: spectacle.punch,
+    image,
+    location: { '@type': 'Place', name: r.venue ?? r.city, address: adresse },
+    offers: offre,
     organizer: compagnie,
     performer: compagnie,
-  };
+  });
 }

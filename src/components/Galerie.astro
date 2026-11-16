@@ -77,65 +77,69 @@ const tuiles = await Promise.all(
 <script>
   // Le texte de la légende vient de la page (data-legende de la boîte) : importer
   // le dictionnaire mettrait aussi tout le texte légal dans le paquet de la galerie.
-  document.addEventListener('astro:page-load', () => {
-    const boîte = document.querySelector<HTMLDialogElement>('dialog.js-visionneuse');
-    if (!boîte) return;
-    const vignettes = [...document.querySelectorAll<HTMLButtonElement>('.js-vignette')];
-    const classes = boîte.querySelector('img')?.className ?? '';
-    const légende = boîte.querySelector<HTMLElement>('.js-legende')!;
-    const économe = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
-    let position = 0;
-    let retour: HTMLElement | null = null;
+  const texteLégende = (modèle: string | undefined, légende: string | undefined, { position, total }: { position: number; total: number }) =>
+    (modèle ?? '')
+      .replace('{légende}', () => légende ?? '')
+      .replace('{position}', String(position))
+      .replace('{total}', String(total));
 
-    // La grande image d'une vignette, chargée une seule fois et décodée : une
-    // promesse partagée par l'affichage et le préchargement des voisines.
-    // Hors de la page, dans son propre <picture>, pour que le navigateur y
-    // choisisse l'AVIF ; la source et les srcset sont posés avant le src,
-    // sinon le petit WebP partirait d'abord. On attend `load` avant decode() :
-    // sur WebKit, decode() d'une image détachée peut se résoudre trop tôt.
-    // Le <picture> est gardé et affiché tel quel : l'<img> sortie de son
-    // cadre referait son choix sans la source AVIF, et téléchargerait le WebP.
+  // La grande image d'une vignette, décodée : hors de la page, dans son propre
+  // <picture>, pour que le navigateur y choisisse l'AVIF ; la source et les srcset
+  // sont posés avant le src, sinon le petit WebP partirait d'abord. On attend `load`
+  // avant decode() : sur WebKit, decode() d'une image détachée peut se résoudre
+  // trop tôt. Le <picture> est gardé et affiché tel quel : l'<img> sortie de son
+  // cadre referait son choix sans la source AVIF, et téléchargerait le WebP.
+  const grandeImage = async (v: HTMLButtonElement, priorité: 'high' | 'low') => {
+    const cadre = document.createElement('picture');
+    cadre.className = 'contents';
+    const img = document.createElement('img');
+    if (v.dataset.avif) {
+      const source = document.createElement('source');
+      source.type = 'image/avif';
+      source.sizes = v.dataset.sizes ?? '100vw';
+      source.srcset = v.dataset.avif;
+      cadre.append(source);
+    }
+    cadre.append(img);
+    img.fetchPriority = priorité;
+    img.decoding = 'async';
+    img.sizes = v.dataset.sizes ?? '100vw';
+    img.srcset = v.dataset.srcset ?? '';
+    img.src = v.dataset.src ?? '';
+    await new Promise<void>((ok, échec) => {
+      img.addEventListener('load', () => ok(), { once: true });
+      img.addEventListener('error', () => échec(), { once: true });
+    });
+    // Un décodage refusé n'empêche pas l'image de s'afficher au chargement.
+    await img.decode().catch(() => {});
+    return cadre;
+  };
+
+  // Chaque grande image n'est chargée qu'une fois : une promesse partagée par
+  // l'affichage et le préchargement des voisines.
+  const chargeur = (vignettes: HTMLButtonElement[]) => {
     const grandes = new Map<number, Promise<HTMLPictureElement>>();
-    const charger = (i: number, priorité: 'high' | 'low') => {
+    return (i: number, priorité: 'high' | 'low') => {
       let p = grandes.get(i);
       if (!p) {
-        const v = vignettes[i];
-        const cadre = document.createElement('picture');
-        cadre.className = 'contents';
-        const img = document.createElement('img');
-        if (v.dataset.avif) {
-          const source = document.createElement('source');
-          source.type = 'image/avif';
-          source.sizes = v.dataset.sizes ?? '100vw';
-          source.srcset = v.dataset.avif;
-          cadre.append(source);
-        }
-        cadre.append(img);
-        img.fetchPriority = priorité;
-        img.decoding = 'async';
-        img.sizes = v.dataset.sizes ?? '100vw';
-        img.srcset = v.dataset.srcset ?? '';
-        img.src = v.dataset.src ?? '';
-        p = new Promise<void>((ok, échec) => {
-          img.addEventListener('load', () => ok(), { once: true });
-          img.addEventListener('error', () => échec(), { once: true });
-        })
-          .then(() => img.decode().catch(() => {}))
-          .then(() => cadre);
+        p = grandeImage(vignettes[i], priorité);
         // Une image en échec pourra être redemandée.
         p.catch(() => grandes.delete(i));
         grandes.set(i, p);
       }
       return p;
     };
+  };
 
-    // L'image affichée prend la place de la précédente dans la visionneuse,
-    // à la taille de la photo contenue dans l'écran, qu'elle soit la vignette
-    // ou la grande : sans ça, la vignette s'afficherait à sa petite taille
-    // naturelle, puis sauterait. 6rem : les marges haute et basse de la
-    // boîte (pt-14, pb-10), où vivent le bouton Fermer et la légende.
+  // L'image affichée prend la place de la précédente dans la visionneuse,
+  // à la taille de la photo contenue dans l'écran, qu'elle soit la vignette
+  // ou la grande : sans ça, la vignette s'afficherait à sa petite taille
+  // naturelle, puis sauterait. 6rem : les marges haute et basse de la
+  // boîte (pt-14, pb-10), où vivent le bouton Fermer et la légende.
+  const afficheur = (boîte: HTMLDialogElement) => {
+    const classes = boîte.querySelector('img')?.className ?? '';
     let affichée: Element = boîte.querySelector('img')!;
-    const afficher = (nœud: HTMLImageElement | HTMLPictureElement, alt: string, ratio: number) => {
+    return (nœud: HTMLImageElement | HTMLPictureElement, alt: string, ratio: number) => {
       const img = nœud instanceof HTMLImageElement ? nœud : nœud.querySelector('img')!;
       img.className = classes;
       img.alt = alt;
@@ -146,6 +150,46 @@ const tuiles = await Promise.all(
       if (affichée !== nœud) affichée.replaceWith(nœud);
       affichée = nœud;
     };
+  };
+
+  const brancherCommandes = (boîte: HTMLDialogElement, avancer: (pas: number) => void) => {
+    boîte.querySelector('.js-fermer')?.addEventListener('click', () => boîte.close());
+    boîte.querySelectorAll<HTMLElement>('[data-pas]').forEach((b) => b.addEventListener('click', () => avancer(Number(b.dataset.pas))));
+    // Un clic sur le fond (le dialogue lui-même, pas l'image ni un bouton) ferme.
+    boîte.addEventListener('click', (e) => {
+      if (e.target === boîte) boîte.close();
+    });
+    boîte.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') avancer(1);
+      if (e.key === 'ArrowLeft') avancer(-1);
+    });
+  };
+
+  // Le balayage : cinquante pixels décident.
+  const SEUIL_BALAYAGE_PX = 50;
+  const balayer = (boîte: HTMLDialogElement, avancer: (pas: number) => void) => {
+    let x0: number | null = null;
+    boîte.addEventListener('touchstart', (e) => (x0 = e.touches[0].clientX), { passive: true });
+    boîte.addEventListener('touchend', (e) => {
+      if (x0 === null) return;
+      const dx = e.changedTouches[0].clientX - x0;
+      if (Math.abs(dx) > SEUIL_BALAYAGE_PX) avancer(dx < 0 ? 1 : -1);
+      x0 = null;
+    });
+  };
+
+  document.addEventListener('astro:page-load', () => {
+    const boîte = document.querySelector<HTMLDialogElement>('dialog.js-visionneuse');
+    if (!boîte) return;
+    const vignettes = [...document.querySelectorAll<HTMLButtonElement>('.js-vignette')];
+    const légende = boîte.querySelector<HTMLElement>('.js-legende')!;
+    const économe = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
+    let position = 0;
+    let retour: HTMLElement | null = null;
+
+    const charger = chargeur(vignettes);
+
+    const afficher = afficheur(boîte);
 
     const montrer = () => {
       const i = position;
@@ -153,10 +197,7 @@ const tuiles = await Promise.all(
       const vignette = v.querySelector('img');
       const alt = vignette?.alt ?? '';
       const ratio = Number(v.dataset.ratio) || 0;
-      légende.textContent = (boîte.dataset.legende ?? '')
-        .replace('{légende}', () => v.dataset.legende ?? '')
-        .replace('{position}', String(i + 1))
-        .replace('{total}', String(vignettes.length));
+      légende.textContent = texteLégende(boîte.dataset.legende, v.dataset.legende, { position: i + 1, total: vignettes.length });
       // D'abord la vignette déjà chargée, agrandie : la photo est là tout de
       // suite, et se précise quand la grande arrive.
       if (vignette?.currentSrc) {
@@ -168,7 +209,9 @@ const tuiles = await Promise.all(
         .then((cadre) => {
           if (position === i && boîte.open) afficher(cadre, alt, ratio);
         })
+        // Photo introuvable : la vignette agrandie reste à l'écran, il n'y a rien d'autre à montrer.
         .catch(() => {});
+      // Les voisines sont un préchargement : qu'il échoue ne regarde personne.
       if (!économe) for (const pas of [1, -1]) charger((i + pas + vignettes.length) % vignettes.length, 'low').catch(() => {});
     };
     const avancer = (pas: number) => {
@@ -185,26 +228,9 @@ const tuiles = await Promise.all(
         boîte.querySelector<HTMLElement>('.js-fermer')?.focus();
       })
     );
-    boîte.querySelector('.js-fermer')?.addEventListener('click', () => boîte.close());
-    boîte.querySelectorAll<HTMLElement>('[data-pas]').forEach((b) => b.addEventListener('click', () => avancer(Number(b.dataset.pas))));
-    // Un clic sur le fond (le dialogue lui-même, pas l'image ni un bouton) ferme.
-    boîte.addEventListener('click', (e) => {
-      if (e.target === boîte) boîte.close();
-    });
-    boîte.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') avancer(1);
-      if (e.key === 'ArrowLeft') avancer(-1);
-    });
+    brancherCommandes(boîte, avancer);
     boîte.addEventListener('close', () => retour?.focus());
 
-    // Le balayage : cinquante pixels décident.
-    let x0: number | null = null;
-    boîte.addEventListener('touchstart', (e) => (x0 = e.touches[0].clientX), { passive: true });
-    boîte.addEventListener('touchend', (e) => {
-      if (x0 === null) return;
-      const dx = e.changedTouches[0].clientX - x0;
-      if (Math.abs(dx) > 50) avancer(dx < 0 ? 1 : -1);
-      x0 = null;
-    });
+    balayer(boîte, avancer);
   });
 </script>

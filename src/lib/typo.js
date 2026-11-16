@@ -14,7 +14,7 @@
 //
 // Pure, sans dépendance : testée dans test/typo.test.js.
 
-const INSÉCABLE = ' ';
+export const INSÉCABLE =' ';
 const FINE = ' ';
 
 /**

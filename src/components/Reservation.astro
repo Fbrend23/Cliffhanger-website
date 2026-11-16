@@ -128,6 +128,19 @@ const bloc = ['mt-20 md:mt-24 lg:mt-32', !email && 'sans-js:hidden'];
     merci.focus();
   };
 
+  // Ce que le visiteur a saisi, dans la forme qu'attend réserver().
+  const demandeDe = (form: HTMLFormElement, d: FormData) => {
+    const choix = form.querySelector<HTMLSelectElement>('select[name="representation"]')!.selectedOptions[0];
+    return {
+      slug: choix.dataset.slug!,
+      id: choix.value,
+      nom: `${d.get('prenom') ?? ''} ${d.get('nom') ?? ''}`.trim(),
+      email: String(d.get('email') ?? '').trim(),
+      places: Number(d.get('places') ?? 1),
+      message: String(d.get('message') ?? '').trim() || null,
+    };
+  };
+
   // Délégués sur le document : le routeur change de page sans recharger, et
   // un écouteur posé sur le formulaire se perdrait d'une visite à l'autre.
   document.addEventListener('submit', async (e) => {
@@ -141,7 +154,6 @@ const bloc = ['mt-20 md:mt-24 lg:mt-32', !email && 'sans-js:hidden'];
 
     const statut = form.querySelector<HTMLElement>('.js-statut')!;
     const bouton = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
-    const choix = form.querySelector<HTMLSelectElement>('select[name="representation"]')!.selectedOptions[0];
     const dire = (texte: string, erreur = false) => {
       statut.textContent = texte;
       statut.toggleAttribute('data-erreur', erreur);
@@ -151,14 +163,7 @@ const bloc = ['mt-20 md:mt-24 lg:mt-32', !email && 'sans-js:hidden'];
     dire(form.dataset.envoi!);
     const résultat = await réserver(
       { url: form.dataset.url!, clé: form.dataset.cle! },
-      {
-        slug: choix.dataset.slug!,
-        id: choix.value,
-        nom: `${d.get('prenom') ?? ''} ${d.get('nom') ?? ''}`.trim(),
-        email: String(d.get('email') ?? '').trim(),
-        places: Number(d.get('places') ?? 1),
-        message: String(d.get('message') ?? '').trim() || null,
-      }
+      demandeDe(form, d)
     ).catch(() => ({ ok: false as const, message: form.dataset.horsLigne! }));
 
     if (!résultat.ok) {

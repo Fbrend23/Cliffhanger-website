@@ -15,6 +15,7 @@
 // réservation (voir réserver) : ce module n'importe donc rien de Node. Même
 // connecteur que Maisallezfieu.
 
+import { messageDe } from './erreurs.js';
 import { échapper } from './typo.js';
 
 /** @typedef {{ PRODYSOS_URL: string, PRODYSOS_KEY: string, PRODYSOS_COMPANY: string }} EnvProdysos */
@@ -36,14 +37,18 @@ export function prodysosConfiguré(env) {
 // Un 522 de Cloudflare devant Supabase est souvent un raté de quelques
 // secondes : deux nouveaux essais avant de faire échouer le build.
 const DÉLAIS = [2000, 5000];
+// Délais de coupure d'un échange : la lecture des spectacles (jusqu'au build), puis la demande de réservation (une personne attend).
+const DÉLAI_LECTURE_MS = 30_000;
+const DÉLAI_RÉSERVATION_MS = 15_000;
+// Longueur du corps d'une erreur Prodysos repris dans le message.
+const DÉTAIL_ERREUR_MAX = 300;
 
 /**
  * @param {EnvProdysos} env
- * @param {string} fonction
- * @param {unknown} corps
+ * @param {{ fonction: string, corps: unknown }} appel
  * @param {number[]} [délais]
  */
-async function rpc(env, fonction, corps, délais = DÉLAIS) {
+async function rpc(env, { fonction, corps }, délais = DÉLAIS) {
   for (let essai = 0; ; essai++) {
     let res;
     try {
@@ -52,12 +57,12 @@ async function rpc(env, fonction, corps, délais = DÉLAIS) {
         headers: { apikey: env.PRODYSOS_KEY, Authorization: `Bearer ${env.PRODYSOS_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(corps),
         // Sans délai, une connexion figée tiendrait le déploiement jusqu'aux 20 min du job.
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(DÉLAI_LECTURE_MS),
       });
     } catch (e) {
       // Une erreur réseau est aussi passagère qu'un 5xx : mêmes essais.
-      if (essai >= délais.length) throw new Error(`Prodysos injoignable (${fonction}) : ${e instanceof Error ? e.message : String(e)}`, { cause: e });
-      await attendre(délais[essai], fonction, e instanceof Error ? e.message : String(e));
+      if (essai >= délais.length) throw new Error(`Prodysos injoignable (${fonction}) : ${messageDe(e)}`, { cause: e });
+      await attendre(délais[essai], fonction, messageDe(e));
       continue;
     }
     if (res.ok) return res.json();
@@ -84,7 +89,7 @@ function attendre(ms, fonction, raison) {
 async function décrireErreur(res) {
   const détail = await res.text().catch(() => '');
   if ((res.headers.get('content-type') ?? '').includes('text/html')) return '(page HTML : Prodysos injoignable derrière Cloudflare)';
-  return détail.length > 300 ? `${détail.slice(0, 300)}…` : détail;
+  return détail.length > DÉTAIL_ERREUR_MAX ? `${détail.slice(0, DÉTAIL_ERREUR_MAX)}…` : détail;
 }
 
 /**
@@ -98,7 +103,7 @@ async function décrireErreur(res) {
  * @param {{ délais?: number[] }} [options]  les attentes entre les essais (les tests les raccourcissent)
  */
 export async function lireSpectaclesProdysos(env, { délais } = {}) {
-  const data = await rpc(env, 'get_public_company_shows', { p_company_slug: env.PRODYSOS_COMPANY }, délais);
+  const data = await rpc(env, { fonction: 'get_public_company_shows', corps: { p_company_slug: env.PRODYSOS_COMPANY } }, délais);
   if (!data) {
     throw new Error(
       `Prodysos ne connaît aucune compagnie publique « ${env.PRODYSOS_COMPANY} » : ` +
@@ -125,10 +130,10 @@ const bruxelles = new Intl.DateTimeFormat('en-CA', {
  * @param {string|number|null|undefined} horodatage  un nombre est un instant en millisecondes
  */
 export function jourEtHeure(horodatage) {
-  const d = new Date(horodatage ?? '');
-  if (Number.isNaN(d.getTime())) return null;
-  const p = Object.fromEntries(bruxelles.formatToParts(d).map((x) => [x.type, x.value]));
-  return { day: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+  const instant = new Date(horodatage ?? '');
+  if (Number.isNaN(instant.getTime())) return null;
+  const parties = Object.fromEntries(bruxelles.formatToParts(instant).map((partie) => [partie.type, partie.value]));
+  return { day: `${parties.year}-${parties.month}-${parties.day}`, time: `${parties.hour}:${parties.minute}` };
 }
 
 /**
@@ -175,6 +180,44 @@ export function titreNormalisé(titre) {
 }
 
 /**
+ * Les liens posés à la main (`prodysos_slug`), et les spectacles du CMS qui n'en ont pas.
+ * @template {{ slug: string, prodysos_slug?: string|null, price?: string|null }} S
+ * @param {S[]} spectaclesCms
+ */
+function liensForcés(spectaclesCms) {
+  /** @type {Map<string, { slug: string, price: string|null }>} */
+  const liens = new Map();
+  /** @type {S[]} */
+  const libres = [];
+  for (const s of spectaclesCms) {
+    const clé = texteOuNull(s.prodysos_slug);
+    if (!clé) {
+      libres.push(s);
+      continue;
+    }
+    const déjà = liens.get(clé);
+    if (déjà) throw new Error(`Deux spectacles publiés réclament le spectacle Prodysos « ${clé} » : ${déjà.slug} et ${s.slug}.`);
+    liens.set(clé, { slug: s.slug, price: texteOuNull(s.price) });
+  }
+  return { liens, libres };
+}
+
+/**
+ * Les spectacles du CMS par titre normalisé ; un titre vide n'en indexe aucun.
+ * @template {{ title?: string|null }} S
+ * @param {S[]} spectacles
+ */
+function indexerParTitre(spectacles) {
+  /** @type {Map<string, S[]>} */
+  const parTitre = new Map();
+  for (const s of spectacles) {
+    const titre = titreNormalisé(s.title);
+    if (titre) parTitre.set(titre, [...(parTitre.get(titre) ?? []), s]);
+  }
+  return parTitre;
+}
+
+/**
  * Quel spectacle du CMS reçoit les dates de quel spectacle Prodysos.
  *
  * 1. Le `prodysos_slug` saisi dans le CMS : le lien forcé, pour des titres qui
@@ -195,27 +238,8 @@ export function titreNormalisé(titre) {
  * @returns {Map<string, { slug: string, price: string|null }>}  slug Prodysos → spectacle du CMS
  */
 export function relier(spectaclesProdysos, spectaclesCms, { avertir, informer = () => {} }) {
-  const liens = new Map();
-  /** @type {typeof spectaclesCms} */
-  const libres = [];
-  for (const s of spectaclesCms) {
-    const clé = texteOuNull(s.prodysos_slug);
-    if (!clé) {
-      libres.push(s);
-      continue;
-    }
-    if (liens.has(clé)) {
-      throw new Error(`Deux spectacles publiés réclament le spectacle Prodysos « ${clé} » : ${liens.get(clé).slug} et ${s.slug}.`);
-    }
-    liens.set(clé, { slug: s.slug, price: texteOuNull(s.price) });
-  }
-
-  /** @type {Map<string, typeof spectaclesCms>} */
-  const parTitre = new Map();
-  for (const s of libres) {
-    const titre = titreNormalisé(s.title);
-    if (titre) parTitre.set(titre, [...(parTitre.get(titre) ?? []), s]);
-  }
+  const { liens, libres } = liensForcés(spectaclesCms);
+  const parTitre = indexerParTitre(libres);
   for (const show of spectaclesProdysos) {
     if (!show?.slug || liens.has(show.slug)) continue;
     const candidats = parTitre.get(titreNormalisé(show.title)) ?? [];
@@ -243,38 +267,61 @@ export function lignesProdysos(spectaclesProdysos, parSlugProdysos, avertir) {
   const lignes = [];
   for (const show of spectaclesProdysos) {
     const cible = parSlugProdysos.get(show?.slug);
-    const représentations = Array.isArray(show?.representations) ? show.representations : [];
+    const représentations = représentationsDe(show);
     if (!cible) {
-      if (représentations.length) avertir(`Prodysos « ${show?.slug} » (« ${show?.title} ») : aucun spectacle publié de ce titre ni qui le réclame (prodysos_slug), ${représentations.length} date(s) ignorée(s)`);
+      signalerIgnoré(show, représentations, avertir);
       continue;
     }
     for (const r of représentations) {
-      const quand = jourEtHeure(r?.date);
-      if (!quand) {
-        avertir(`Prodysos « ${show.slug} » : représentation ${r?.id} sans date lisible, ignorée`);
-        continue;
-      }
-      const venue = texteOuNull(r.location_name);
-      const lieu = adresse(r.location_address);
-      const city = lieu?.city ?? null;
-      if (r.location_address && !city) avertir(`Prodysos « ${show.slug} » : commune introuvable dans « ${r.location_address} », la salle s’affiche seule`);
-      // De quoi réserver cette date : le spectacle Prodysos (sa page publique)
-      // et la représentation, ce qu'attend create_public_reservation.
-      const reservation = { slug: show.slug, id: String(r.id) };
-      lignes.push({
-        id: `prodysos-${r.id}`,
-        spectacle: cible.slug,
-        ...quand,
-        venue,
-        city,
-        street: lieu?.street ?? null,
-        postalCode: lieu?.postalCode ?? null,
-        price: cible.price,
-        reservation,
-      });
+      const ligne = ligneProdysos(r, { slug: show.slug, cible, avertir });
+      if (ligne) lignes.push(ligne);
     }
   }
   return lignes;
+}
+
+/** @param {any} show */
+const représentationsDe = (show) => (Array.isArray(show?.representations) ? show.representations : []);
+
+/**
+ * Un spectacle Prodysos que rien ne relie au CMS : ses dates sont ignorées, et on le dit
+ * s'il en avait.
+ * @param {any} show
+ * @param {any[]} représentations
+ * @param {(message: string) => void} avertir
+ */
+function signalerIgnoré(show, représentations, avertir) {
+  if (!représentations.length) return;
+  avertir(`Prodysos « ${show?.slug} » (« ${show?.title} ») : aucun spectacle publié de ce titre ni qui le réclame (prodysos_slug), ${représentations.length} date(s) ignorée(s)`);
+}
+
+const SANS_ADRESSE = { street: null, postalCode: null, city: null };
+
+/**
+ * Une représentation Prodysos en ligne du CMS, ou null si elle n'a pas de date lisible.
+ * @param {any} r
+ * @param {{ slug: string, cible: { slug: string, price: string|null }, avertir: (message: string) => void }} contexte
+ *   `slug` : le spectacle Prodysos ; `cible` : le spectacle du CMS relié
+ */
+function ligneProdysos(r, { slug, cible, avertir }) {
+  const quand = jourEtHeure(r?.date);
+  if (!quand) {
+    avertir(`Prodysos « ${slug} » : représentation ${r?.id} sans date lisible, ignorée`);
+    return null;
+  }
+  const lieu = adresse(r.location_address) ?? SANS_ADRESSE;
+  if (r.location_address && !lieu.city) avertir(`Prodysos « ${slug} » : commune introuvable dans « ${r.location_address} », la salle s’affiche seule`);
+  return {
+    id: `prodysos-${r.id}`,
+    spectacle: cible.slug,
+    ...quand,
+    venue: texteOuNull(r.location_name),
+    ...lieu,
+    price: cible.price,
+    // De quoi réserver cette date : le spectacle Prodysos (sa page publique)
+    // et la représentation, ce qu'attend create_public_reservation.
+    reservation: { slug, id: String(r.id) },
+  };
 }
 
 /** @param {unknown} v */
@@ -385,9 +432,10 @@ export async function réserver(prodysos, demande) {
     }),
     // Sur un réseau bloqué, « Envoi en cours… » resterait affiché sans fin : au
     // bout de 15 s la fonction lève, comme pour toute erreur réseau.
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(DÉLAI_RÉSERVATION_MS),
   });
   if (res.ok) return { ok: true };
+  // Un refus sans corps lisible (page d'erreur du proxy) : le message par défaut du formulaire s'affiche.
   const corps = await res.json().catch(() => null);
   return { ok: false, message: typeof corps?.message === 'string' && corps.message.trim() ? corps.message.trim() : null };
 }

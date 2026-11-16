@@ -18,7 +18,7 @@ import { contenu } from "../lib/contenu.js";
 import { aujourdhui, formatJourHeure, formatPrix, lieu } from "../lib/dates.js";
 import { affiche, diapo } from "../lib/images.js";
 import { T } from "../lib/textes.js";
-import { tx, typographier, échapper } from "../lib/typo.js";
+import { INSÉCABLE, tx, typographier, échapper } from "../lib/typo.js";
 
 interface Props {
   spectacle: any;
@@ -45,7 +45,7 @@ const aVenir = dates.some((r) => r.day >= aujourdhui());
 const réservables = dates.filter((r) => r.reservation && r.day >= aujourdhui());
 const réservable = new Set(réservables);
 // Le prix, puis « Réserver » pour une date réservable : le tableau garde ses
-// trois colonnes.
+// trois colonnes. Le « · » reste collé au prix : à la ligne, il ne finit pas seul.
 const dernière = (r: any) =>
   [
     tx(formatPrix(r.price)),
@@ -54,7 +54,7 @@ const dernière = (r: any) =>
       : "",
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(`${INSÉCABLE}· `);
 ---
 
 {

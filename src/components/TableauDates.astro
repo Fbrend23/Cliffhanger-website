@@ -13,11 +13,12 @@ const { lignes, equipe = false } = Astro.props;
 
 // Sur téléphone, chaque ligne est un bloc et ses cellules s'empilent, avec
 // retour à la ligne : un long lieu (« Saint-Josse-ten-Noode ») était coupé.
-// Au-delà, un vrai tableau : la date sur une largeur fixe, le prix à droite.
+// Au-delà, un vrai tableau : la date sur une largeur fixe, le lieu ou le prix à droite, qui
+// revient à la ligne : à 820 px un long lieu élargissait la ligne et faisait défiler le tableau.
 const cellule = [
   // Vide, une cellule ne garde sa place que dans le tableau (les colonnes s'alignent) : empilée, elle n'aurait que sa marge.
   'block align-middle empty:hidden [&+td]:mt-1 sm:table-cell sm:empty:table-cell sm:border-b sm:border-front sm:px-2 sm:py-4',
-  'sm:first:pl-0 sm:first:whitespace-nowrap sm:last:pr-0 sm:last:text-right sm:last:whitespace-nowrap',
+  'sm:first:pl-0 sm:first:whitespace-nowrap sm:last:pr-0 sm:last:text-right',
   equipe ? 'last:text-lg' : 'sm:first:w-60',
 ];
 const titre = 'text-2xl font-normal [&_a]:transition-opacity [&_a]:duration-250 [&_a:hover]:opacity-75';
@@ -26,15 +27,13 @@ const titre = 'text-2xl font-normal [&_a]:transition-opacity [&_a]:duration-250 
 <div class="overflow-x-auto">
   <table class="block w-full border-t-2 border-front tabular-nums sm:table">
     <tbody class="block sm:table-row-group">
-      {
-        lignes.map((cellules) => (
-          <tr class="block border-b border-front py-4 sm:table-row sm:border-0 sm:py-0">
-            {cellules.map((c) => (
-              <td class:list={[cellule, c.titre ? titre : 'text-xl']} set:html={c.html} />
-            ))}
-          </tr>
-        ))
-      }
+      {lignes.map((cellules) => (
+        <tr class="block border-b border-front py-4 sm:table-row sm:border-0 sm:py-0">
+          {cellules.map((c) => (
+            <td class:list={[cellule, c.titre ? titre : 'text-xl']} set:html={c.html} />
+          ))}
+        </tr>
+      ))}
     </tbody>
   </table>
 </div>

@@ -1,6 +1,6 @@
 // ESLint : les erreurs de logique et la complexité, pas le style (le formatage
-// relève de Prettier). Les seuils sont ceux de la checklist du site ; une règle
-// que le code existant ne tient pas encore est en `warn`, avec la raison.
+// relève de Prettier). Les seuils sont ceux de la checklist du site, appliqués
+// par la CI ; une règle que le code ne tient pas encore est en `warn`, avec la raison.
 import js from '@eslint/js';
 import astro from 'eslint-plugin-astro';
 import globals from 'globals';
@@ -20,18 +20,24 @@ export default [
   {
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
-      // Du code qui existait avant la règle : ces fonctions (loaders, Prodysos, SEO, menu) dépassent
-      // les seuils et se découpent au fil des retouches, pas d'un coup. En `warn` elles restent
-      // visibles sans arrêter la CI ; le code neuf est jugé sur ces seuils.
-      complexity: ['warn', 10],
-      'max-depth': ['warn', 3],
-      'max-params': ['warn', 3],
+      // Les seuils de la checklist : une fonction qui les dépasse se découpe (un paramètre en trop
+      // devient un objet, une branche qui a son nom devient une fonction).
+      complexity: ['error', 10],
+      'max-depth': ['error', 3],
+      'max-params': ['error', 3],
+      'max-lines-per-function': ['error', { max: 50, skipBlankLines: true, skipComments: true }],
       'no-console': ['error', { allow: ['warn', 'error'] }],
       // Les objets du CMS sont typés `any` dans les composants, faute de type généré : à resserrer
       // quand les collections en fourniront un.
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
     },
+  },
+  {
+    // Le faux Directus des tests : un serveur de fabrication qui reproduit le filtrage du vrai, pas
+    // du code du site. Ses seuils restent visibles sans arrêter la CI.
+    files: ['test/faux-directus/**'],
+    rules: { complexity: ['warn', 10], 'max-depth': ['warn', 3], 'max-params': ['warn', 3], 'max-lines-per-function': ['warn', 50] },
   },
   {
     // Des commandes : leur sortie est le message pour la personne qui les lance.
