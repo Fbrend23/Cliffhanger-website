@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { INSÉCABLE } from '../src/lib/typo.js';
 import { aujourdhui, formatHeure, formatJour, formatJourHeure, formatPlage, formatPrix, lieu, séries } from '../src/lib/dates.js';
 
 test('un prix : le nombre seul prend son €, le texte reste', () => {
-  assert.equal(formatPrix('6,07'), '6,07 €');
-  assert.equal(formatPrix(' 12 '), '12 €');
-  assert.equal(formatPrix('12 €'), '12 €');
+  assert.equal(formatPrix('6,07'), `6,07${INSÉCABLE}€`);
+  assert.equal(formatPrix(' 12 '), `12${INSÉCABLE}€`);
+  assert.equal(formatPrix('12 €'), `12${INSÉCABLE}€`);
   assert.equal(formatPrix('prix libre'), 'prix libre');
   assert.equal(formatPrix(null), '');
 });

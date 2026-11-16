@@ -6,6 +6,8 @@
 // écrivent le même jour. Seule « aujourd'hui » dépend du fuseau, et c'est
 // celui de Bruxelles, où les représentations ont lieu.
 
+import { INSÉCABLE } from './typo.js';
+
 const formatJourMois = new Intl.DateTimeFormat('fr-BE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
 /** @param {string} iso */
@@ -70,11 +72,13 @@ export const lieu = (r) => [r.venue, r.city].filter(Boolean).join(', ');
  * Le prix tel qu'on le lit : un nombre seul (« 6,07 ») prend son « € », un
  * texte (« 12 € », « prix libre ») reste tel quel. Le même prix nourrit la
  * page et les données structurées (`prixEnEuros`), qui exigent le « € ».
+ * L'espace est insécable : dans une cellule étroite, le « € » ne reste pas seul sur la ligne suivante.
  * @param {string|null|undefined} prix
  */
 export function formatPrix(prix) {
   const p = (prix ?? '').trim();
-  return /^\d+(?:[.,]\d{1,2})?$/.test(p) ? `${p} €` : p;
+  const avecEuro = /^\d+(?:[.,]\d{1,2})?$/.test(p) ? `${p} €` : p;
+  return avecEuro.replace(/(\d) €/g, `$1${INSÉCABLE}€`);
 }
 
 /**
