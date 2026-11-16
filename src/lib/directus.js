@@ -70,7 +70,8 @@ export const champsFichier = (relation) => CHAMPS_FICHIER.map((c) => `${relation
 // rejouent aussi, deux fois, et une connexion figée s'arrête au bout de 30 s :
 // sans délai, elle tiendrait le déploiement de nuit jusqu'aux 20 min du job.
 // Le délai court l'échange entier, corps compris : un original de 15 Mo sur une
-// liaison lente ne tient pas en 30 s, d'où `fichier` pour les téléchargements.
+// liaison lente ne tient pas en 30 s, d'où `fichier` pour les téléchargements, y compris
+// l'affiche de Prodysos, qui ne vient pas de Directus mais gèlerait le build de la même façon.
 // Un objet exporté, pour que les tests réduisent les attentes.
 export const DÉLAIS = { panne: [2000, 5000], max: 30_000, fichier: 120_000 };
 
@@ -323,7 +324,7 @@ export async function assurerFichierExterne(url, id, { cache, logger }) {
   await ranger({ cache, logger, id, nom, version: url, libellé: url }, async () => {
     let res;
     try {
-      res = await fetch(url);
+      res = await fetch(url, { signal: AbortSignal.timeout(DÉLAIS.fichier) });
     } catch (e) {
       throw new Error(`Image injoignable (${url}) : ${messageDe(e)}`, { cause: e });
     }
