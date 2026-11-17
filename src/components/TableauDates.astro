@@ -20,6 +20,8 @@ const cellule = [
   'block align-middle empty:hidden [&+td]:mt-1 sm:table-cell sm:empty:table-cell sm:border-b sm:border-front sm:px-2 sm:py-4',
   'sm:first:pl-0 sm:first:whitespace-nowrap sm:last:pr-0 sm:last:text-right',
   equipe ? 'last:text-lg' : 'sm:first:w-60',
+  // Au doigt, la zone d'un lien monte à 44 px de haut sans changer la mise en page (zone invisible, comme le fil d'Ariane).
+  'tactile:[&_a]:relative tactile:[&_a]:after:absolute tactile:[&_a]:after:inset-x-0 tactile:[&_a]:after:-inset-y-2',
 ];
 const titre = 'text-2xl font-normal [&_a]:transition-opacity [&_a]:duration-250 [&_a:hover]:opacity-75';
 ---

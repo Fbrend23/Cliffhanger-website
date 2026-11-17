@@ -98,13 +98,25 @@ function verdict(res, limites, pannes) {
 }
 
 /**
+ * Ce que `appeler` dit et envoie selon l'adresse. Le jeton du CMS ne part qu'à Directus : on le
+ * déduit de l'origine de l'adresse, pas d'un drapeau qu'un appelant pourrait oublier (une
+ * adresse tierce, l'affiche de Prodysos par exemple, ne le reçoit jamais). Les messages d'erreur
+ * nomment la bonne source, sinon le journal de la nuit enverrait chercher dans le CMS une panne de Prodysos.
+ * @param {string} url
+ * @returns {{ adresse: string, source: string, headers: Record<string, string> }}
+ */
+function désigner(url) {
+  if (new URL(url).origin !== new URL(DIRECTUS_URL).origin) return { adresse: url, source: 'Source externe', headers: {} };
+  return { adresse: url.replace(DIRECTUS_URL, ''), source: 'CMS', headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` } };
+}
+
+/**
  * @param {string} url
  * @param {number} [délai]  durée maximale de l'échange, corps compris
  * @returns {Promise<Response>}
  */
 async function appeler(url, délai = DÉLAIS.max) {
-  const adresse = url.replace(DIRECTUS_URL, '');
-  const headers = { Authorization: `Bearer ${DIRECTUS_TOKEN}` };
+  const { adresse, source, headers } = désigner(url);
   let limites = 0;
   let pannes = 0;
 
@@ -113,14 +125,14 @@ async function appeler(url, délai = DÉLAIS.max) {
     try {
       res = await fetch(url, { headers, signal: AbortSignal.timeout(délai) });
     } catch (e) {
-      if (pannes >= DÉLAIS.panne.length) throw new Error(`CMS injoignable (${adresse}) : ${messageDe(e)}`, { cause: e });
+      if (pannes >= DÉLAIS.panne.length) throw new Error(`${source} injoignable (${adresse}) : ${messageDe(e)}`, { cause: e });
       await attendre(DÉLAIS.panne[pannes++]);
       continue;
     }
 
     const suite = verdict(res, limites, pannes);
     if (suite === 'ok') return res;
-    if (suite === 'refus') throw new Error(`CMS ${adresse} : HTTP ${res.status} ${await res.text().catch(() => '')}`.trim());
+    if (suite === 'refus') throw new Error(`${source} ${adresse} : HTTP ${res.status} ${await res.text().catch(() => '')}`.trim());
     if (suite === 'limite') {
       limites++;
       await attendre((Number(res.headers.get('retry-after')) || 1) * MS_PAR_SECONDE + MARGE_RETRY_AFTER_MS);
@@ -321,16 +333,10 @@ export async function dimensionsFichier(fichier, cache) {
 export async function assurerFichierExterne(url, id, { cache, logger }) {
   const ext = (path.extname(new URL(url).pathname).slice(1) || 'jpg').toLowerCase();
   const nom = `${id}.${ext}`;
-  await ranger({ cache, logger, id, nom, version: url, libellé: url }, async () => {
-    let res;
-    try {
-      res = await fetch(url, { signal: AbortSignal.timeout(DÉLAIS.fichier) });
-    } catch (e) {
-      throw new Error(`Image injoignable (${url}) : ${messageDe(e)}`, { cause: e });
-    }
-    if (!res.ok) throw new Error(`Image ${url} : HTTP ${res.status}`);
-    return res;
-  });
+  // Mêmes rejeux (429, 5xx, coupure) que Directus : un hoquet de Prodysos ne doit pas arrêter le build de nuit.
+  await ranger({ cache, logger, id, nom, version: url, libellé: url }, () =>
+    appeler(url, DÉLAIS.fichier)
+  );
   // Lu depuis un tampon : sharp, sur un chemin, garde le fichier ouvert, et
   // Windows refuse alors de le purger ou de le remplacer.
   const { width = null, height = null } = await sharp(await readFile(path.join(cache.dossier, nom))).metadata();
