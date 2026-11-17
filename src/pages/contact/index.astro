@@ -23,7 +23,7 @@ const réseaux = [
     {r.email && (
       <p class="text-mail font-normal [word-break:break-word]" data-cascade>
         <a
-          class="border-b border-front/40 transition-colors duration-250 hover:border-front focus-visible:border-front"
+          class="relative tactile:after:absolute tactile:after:inset-x-0 tactile:after:-inset-y-2 border-b border-front/40 transition-colors duration-250 hover:border-front focus-visible:border-front"
           href={`mailto:${r.email}`}
         >
           {r.email}
