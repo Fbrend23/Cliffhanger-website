@@ -97,14 +97,18 @@ function verdict(res, limites, pannes) {
   return res.ok ? 'ok' : 'refus';
 }
 
+/** @param {boolean} [tiers] */
+const entêtes = (tiers) => (tiers ? {} : { Authorization: `Bearer ${DIRECTUS_TOKEN}` });
+
 /**
  * @param {string} url
  * @param {number} [délai]  durée maximale de l'échange, corps compris
+ * @param {boolean} [tiers]  vrai pour une adresse qui n'est pas Directus (Prodysos) : le jeton du CMS n'y part jamais
  * @returns {Promise<Response>}
  */
-async function appeler(url, délai = DÉLAIS.max) {
+async function appeler(url, délai = DÉLAIS.max, tiers) {
   const adresse = url.replace(DIRECTUS_URL, '');
-  const headers = { Authorization: `Bearer ${DIRECTUS_TOKEN}` };
+  const headers = entêtes(tiers);
   let limites = 0;
   let pannes = 0;
 
@@ -321,16 +325,10 @@ export async function dimensionsFichier(fichier, cache) {
 export async function assurerFichierExterne(url, id, { cache, logger }) {
   const ext = (path.extname(new URL(url).pathname).slice(1) || 'jpg').toLowerCase();
   const nom = `${id}.${ext}`;
-  await ranger({ cache, logger, id, nom, version: url, libellé: url }, async () => {
-    let res;
-    try {
-      res = await fetch(url, { signal: AbortSignal.timeout(DÉLAIS.fichier) });
-    } catch (e) {
-      throw new Error(`Image injoignable (${url}) : ${messageDe(e)}`, { cause: e });
-    }
-    if (!res.ok) throw new Error(`Image ${url} : HTTP ${res.status}`);
-    return res;
-  });
+  // Mêmes rejeux (429, 5xx, coupure) que Directus : un hoquet de Prodysos ne doit pas arrêter le build de nuit.
+  await ranger({ cache, logger, id, nom, version: url, libellé: url }, () =>
+    appeler(url, DÉLAIS.fichier, true)
+  );
   // Lu depuis un tampon : sharp, sur un chemin, garde le fichier ouvert, et
   // Windows refuse alors de le purger ou de le remplacer.
   const { width = null, height = null } = await sharp(await readFile(path.join(cache.dossier, nom))).metadata();

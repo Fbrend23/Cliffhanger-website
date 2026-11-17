@@ -25,6 +25,8 @@ registerHooks({
 let scénario = [];
 /** Les adresses demandées. */
 let demandes = [];
+/** L'en-tête Authorization de chaque demande, pour vérifier que le jeton ne part qu'à Directus. */
+let autorisations = [];
 let serveur;
 let racine;
 /** @type {typeof import('../src/lib/directus.js')} */
@@ -33,10 +35,12 @@ let D;
 before(async () => {
   serveur = http.createServer((req, res) => {
     demandes.push(req.url);
+    autorisations.push(req.headers.authorization);
     const r = scénario.shift() ?? { statut: 500, corps: 'scénario épuisé' };
     if (r.figer) return; // ne répond jamais : c'est le délai du client qui tranche
     res.writeHead(r.statut ?? 200, { 'Content-Type': 'application/json', ...(r.entêtes ?? {}) });
-    res.end(typeof r.corps === 'string' ? r.corps : JSON.stringify(r.corps ?? {}));
+    const brut = typeof r.corps === 'string' || Buffer.isBuffer(r.corps);
+    res.end(brut ? r.corps : JSON.stringify(r.corps ?? {}));
   });
   await new Promise((ok) => serveur.listen(0, '127.0.0.1', ok));
   process.env.DIRECTUS_URL = `http://127.0.0.1:${serveur.address().port}`;
@@ -54,6 +58,7 @@ after(async () => {
 const jouer = (...réponses) => {
   scénario = réponses;
   demandes = [];
+  autorisations = [];
 };
 
 test('un 429 est rejoué après le Retry-After', async () => {
@@ -136,6 +141,17 @@ test('dimensionsFichier : celles du CMS, sinon lues sur l’original, sinon null
   await sharp({ create: { width: 40, height: 20, channels: 3, background: '#888' } }).jpeg().toFile(path.join(cache.dossier, 'lu.jpg'));
   cache.manifest.lu = { modified_on: '', fichier: 'lu.jpg' };
   assert.deepEqual(await D.dimensionsFichier({ id: 'lu', width: null, height: null }, cache), { width: 40, height: 20 });
+});
+
+test('assurerFichierExterne : rejoue un 5xx comme Directus, sans lui envoyer le jeton du CMS', async () => {
+  const cache = await D.ouvrirCache(pathToFileURL(racine + path.sep));
+  const image = await sharp({ create: { width: 30, height: 20, channels: 3, background: '#444' } }).jpeg().toBuffer();
+  jouer({ statut: 502, corps: 'passerelle' }, { corps: image, entêtes: { 'Content-Type': 'image/jpeg' } });
+  const logger = { info() {} };
+  const rendu = await D.assurerFichierExterne('http://127.0.0.1:' + serveur.address().port + '/affiche.jpg?v=1', 'affiche-test', { cache, logger });
+  assert.equal(demandes.length, 2, 'un essai, un rejeu');
+  assert.deepEqual(autorisations, [undefined, undefined], 'jamais le jeton du CMS chez un tiers');
+  assert.deepEqual(rendu, { chemin: './affiche-test.jpg', width: 30, height: 20 });
 });
 
 test('pointFocal : pixels en pourcentages, borné, null sans point ni dimensions', () => {
