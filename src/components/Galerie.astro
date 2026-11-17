@@ -13,7 +13,6 @@
 // basse, pour que les flèches soient instantanées. Comme le portfolio
 // (61e2bf7, 1de987e).
 import Photo from './Photo.astro';
-import Pastille from './Pastille.astro';
 import { grande, vignetteGalerie } from '../lib/images.js';
 import { T } from '../lib/textes.js';
 import { tx, typographier } from '../lib/typo.js';
@@ -42,19 +41,29 @@ const tuiles = await Promise.all(
     };
   })
 );
+// Les filtres, « Tout » d'abord, chacun avec son nombre de photos.
+const filtres = [{ clé: '', titre: T.toutesLesPhotos }, ...groupes].map((g) => ({
+  ...g,
+  nombre: g.clé ? tuiles.filter((t) => t.cle === g.clé).length : tuiles.length,
+}));
 ---
 
 {groupes.length > 0 && (
-  <div class="js-filtres mt-respiration flex flex-wrap gap-2 sans-js:hidden" role="group" aria-label={T.filtrerGalerie} data-cascade>
-    {[{ clé: '', titre: T.toutesLesPhotos }, ...groupes].map((g, i) => (
-      <Pastille
+  <div
+    class="js-filtres mt-respiration flex flex-wrap gap-x-6 gap-y-2 text-base sans-js:hidden"
+    role="group"
+    aria-label={T.filtrerGalerie}
+    data-cascade
+  >
+    {filtres.map((f, i) => (
+      <button
+        class="lien-souligne relative cursor-pointer aria-pressed:border-front after:absolute after:inset-x-0 after:-inset-y-1 tactile:after:-inset-y-3.5"
         type="button"
-        class="aria-pressed:bg-front aria-pressed:text-back"
-        data-filtre={g.clé}
+        data-filtre={f.clé}
         aria-pressed={i === 0 ? 'true' : 'false'}
       >
-        {typographier(g.titre)}
-      </Pastille>
+        {typographier(f.titre)} <span class="opacity-75">({f.nombre})</span>
+      </button>
     ))}
   </div>
 )}
