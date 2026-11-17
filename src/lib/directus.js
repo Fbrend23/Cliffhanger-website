@@ -97,7 +97,10 @@ function verdict(res, limites, pannes) {
   return res.ok ? 'ok' : 'refus';
 }
 
-/** @param {boolean} [tiers] */
+/**
+ * @param {boolean} [tiers]
+ * @returns {Record<string, string>}
+ */
 const entêtes = (tiers) => (tiers ? {} : { Authorization: `Bearer ${DIRECTUS_TOKEN}` });
 
 /**
