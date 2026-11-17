@@ -213,7 +213,7 @@ export const T = {
   filtrerGalerie: 'Filtrer par spectacle',
   toutesLesPhotos: 'Tout',
   /**
-   * @param {number} n
+   * @param {number|string} n
    */
   nombrePhotos: (n) => (n === 1 ? '1 photo' : `${n} photos`),
   // La légende de la visionneuse : « Coulisses · 3 / 9 ».

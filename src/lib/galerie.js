@@ -2,7 +2,7 @@
 import { T } from './textes.js';
 
 /** Clé du groupe des photos sans spectacle. */
-export const CLÉ_COULISSES = 'coulisses';
+const CLÉ_COULISSES = 'coulisses';
 
 /**
  * Le groupe d'une photo : le slug de son spectacle s'il est belge, `coulisses` sans spectacle,
