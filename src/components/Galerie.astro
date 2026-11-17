@@ -18,10 +18,12 @@ import { T } from '../lib/textes.js';
 import { tx, typographier } from '../lib/typo.js';
 
 interface Props {
-  photos: { id: string; caption: string; image: any; width?: number | null; height?: number | null; apercu: string }[];
+  photos: { id: string; caption: string; image: any; width?: number | null; height?: number | null; apercu: string; cle?: string | null }[];
+  // Les filtres : voir groupesGalerie(). Vide, pas de rangée.
+  groupes?: { clé: string; titre: string }[];
 }
 
-const { photos } = Astro.props;
+const { photos, groupes = [] } = Astro.props;
 // Les flèches de la visionneuse, de part et d'autre de l'image.
 const flèche = 'absolute top-1/2 min-h-11 min-w-11 -translate-y-1/2 p-4 text-[3rem] opacity-75';
 // Seule la première vignette part tout de suite, en priorité haute : c'est le LCP de la page. À 390 px
@@ -31,55 +33,97 @@ const flèche = 'absolute top-1/2 min-h-11 min-w-11 -translate-y-1/2 p-4 text-[3
 const tuiles = await Promise.all(
   photos.map(async (p) => {
     const taille = { width: p.width ?? null, height: p.height ?? null };
-    return { caption: p.caption, vignette: await vignetteGalerie(p.image, taille, p.apercu), grande: await grande(p.image, taille) };
+    return {
+      caption: p.caption,
+      cle: p.cle ?? '',
+      vignette: await vignetteGalerie(p.image, taille, p.apercu),
+      grande: await grande(p.image, taille),
+    };
   })
 );
+// Les filtres, « Tout » d'abord, chacun avec son nombre de photos.
+const filtres = [{ clé: '', titre: T.toutesLesPhotos }, ...groupes].map((g) => ({
+  ...g,
+  nombre: g.clé ? tuiles.filter((t) => t.cle === g.clé).length : tuiles.length,
+}));
 ---
 
-<div class="mt-respiration columns-[3_18rem] gap-x-4">
-  {
-    tuiles.map((t, i) => (
-      <figure class="mb-4 break-inside-avoid" data-cascade>
-        <button
-          class="group js-vignette block w-full cursor-zoom-in"
-          type="button"
-          data-srcset={t.grande.srcset}
-          data-avif={t.grande.avif}
-          data-ratio={t.grande.width / t.grande.height}
-          data-src={t.grande.src}
-          data-sizes={t.grande.sizes}
-          data-legende={typographier(t.caption)}
-          aria-label={typographier(T.agrandir(t.caption))}
-        >
-          <Photo
-            img={t.vignette}
-            alt={t.caption}
-            eager={i < 1}
-            class="h-auto w-full animate-[fadein_.6s_ease_both] transition-opacity duration-250 group-hover:opacity-85 group-focus-visible:opacity-85"
-          />
-        </button>
-        <figcaption class="px-1 py-[.35rem] text-xs opacity-75" set:html={tx(t.caption)} />
-      </figure>
-    ))
-  }
+{groupes.length > 0 && (
+  <div
+    class="js-filtres mt-respiration flex flex-wrap gap-x-6 gap-y-2 text-base sans-js:hidden"
+    role="group"
+    aria-label={T.filtrerGalerie}
+    data-cascade
+  >
+    {filtres.map((f, i) => (
+      <button
+        class="lien-souligne relative cursor-pointer aria-pressed:border-front after:absolute after:inset-x-0 after:-inset-y-1 tactile:after:-inset-y-3.5"
+        type="button"
+        data-filtre={f.clé}
+        aria-pressed={i === 0 ? 'true' : 'false'}
+      >
+        {typographier(f.titre)} <span class="opacity-75">({f.nombre})</span>
+      </button>
+    ))}
+  </div>
+)}
+<p class="js-compte sr-only" aria-live="polite" data-un={T.nombrePhotos(1)} data-plusieurs={T.nombrePhotos('{n}')}></p>
+
+<div class:list={['columns-[3_18rem] gap-x-4', groupes.length > 0 ? 'mt-8' : 'mt-respiration']}>
+  {tuiles.map((t, i) => (
+    <figure class="mb-4 break-inside-avoid" data-cascade data-groupe={t.cle}>
+      <button
+        class="group js-vignette block w-full cursor-zoom-in"
+        type="button"
+        data-srcset={t.grande.srcset}
+        data-avif={t.grande.avif}
+        data-ratio={t.grande.width / t.grande.height}
+        data-src={t.grande.src}
+        data-sizes={t.grande.sizes}
+        data-legende={typographier(t.caption)}
+        aria-label={typographier(T.agrandir(t.caption))}
+      >
+        <Photo
+          img={t.vignette}
+          alt={t.caption}
+          eager={i < 1}
+          class="h-auto w-full animate-[fadein_.6s_ease_both] transition-opacity duration-250 group-hover:opacity-85 group-focus-visible:opacity-85"
+        />
+      </button>
+      <figcaption class="px-1 py-[.35rem] text-xs opacity-75" set:html={tx(t.caption)} />
+    </figure>
+  ))}
 </div>
 
 <dialog
   class="js-visionneuse fixed inset-0 z-50 m-0 size-full max-h-none max-w-none touch-pan-y overscroll-contain bg-back/94 px-4 pt-14 pb-10 text-front backdrop:bg-transparent open:flex open:animate-[fadein_.3s_ease_both] open:items-center open:justify-center"
   aria-label={T.photoAgrandie}
-  data-legende={T.légendeVisionneuse("{légende}", "{position}", "{total}")}
+  data-legende={T.légendeVisionneuse('{légende}', '{position}', '{total}')}
 >
-  <button class="js-fermer absolute top-[calc(1rem+var(--safe-top))] right-4 min-h-11 rounded-[2rem] border border-front px-[.9rem] py-[.35rem]" type="button">{T.fermer}</button>
-  <button class={`${flèche} left-0`} type="button" data-pas="-1" aria-label={T.photoPrécédente}>‹</button>
+  <button
+    class="js-fermer absolute top-[calc(1rem+var(--safe-top))] right-4 min-h-11 rounded-[2rem] border border-front px-[.9rem] py-[.35rem]"
+    type="button"
+  >
+    {T.fermer}
+  </button>
+  <button class={`${flèche} left-0`} type="button" data-pas="-1" aria-label={T.photoPrécédente}>
+    ‹
+  </button>
   <img class="max-h-full max-w-full object-contain" alt="" />
-  <button class={`${flèche} right-0`} type="button" data-pas="1" aria-label={T.photoSuivante}>›</button>
+  <button class={`${flèche} right-0`} type="button" data-pas="1" aria-label={T.photoSuivante}>
+    ›
+  </button>
   <p class="js-legende absolute inset-x-0 bottom-4 text-center text-sm opacity-75" aria-live="polite"></p>
 </dialog>
 
 <script>
   // Le texte de la légende vient de la page (data-legende de la boîte) : importer
   // le dictionnaire mettrait aussi tout le texte légal dans le paquet de la galerie.
-  const texteLégende = (modèle: string | undefined, légende: string | undefined, { position, total }: { position: number; total: number }) =>
+  const texteLégende = (
+    modèle: string | undefined,
+    légende: string | undefined,
+    { position, total }: { position: number; total: number }
+  ) =>
     (modèle ?? '')
       .replace('{légende}', () => légende ?? '')
       .replace('{position}', String(position))
@@ -180,17 +224,82 @@ const tuiles = await Promise.all(
     });
   };
 
+  // Le filtre se garde dans l'adresse (?spectacle=slug) : un lien partagé le retrouve. `history.state`
+  // est repassé tel quel, c'est là que le ClientRouter range sa position.
+  const PARAMÈTRE = 'spectacle';
+  const lireFiltre = (valides: string[]) => {
+    const clé = new URL(location.href).searchParams.get(PARAMÈTRE) ?? '';
+    return valides.includes(clé) ? clé : '';
+  };
+  const écrireFiltre = (clé: string) => {
+    const url = new URL(location.href);
+    if (clé) url.searchParams.set(PARAMÈTRE, clé);
+    else url.searchParams.delete(PARAMÈTRE);
+    history.replaceState(history.state, '', url);
+  };
+
+  // Une photo qui réapparaît remonte, plus vite qu'à l'arrivée sur la page (0,04 s par rang, 0,4 s au plus).
+  const relancerApparition = (figure: HTMLElement, rang: number) => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    figure.classList.remove('animate-rise');
+    void figure.offsetWidth;
+    figure.style.animationDelay = `${Math.min(rang * 0.04, 0.4)}s`;
+    figure.classList.add('animate-rise');
+  };
+
+  const annoncer = (n: number) => {
+    const compte = document.querySelector<HTMLElement>('.js-compte');
+    if (!compte) return;
+    compte.textContent = (n === 1 ? compte.dataset.un : compte.dataset.plusieurs)?.replace('{n}', String(n)) ?? '';
+  };
+
+  // Les pastilles montrent ou cachent les photos de leur groupe ; la clé vide (Tout) les montre toutes.
+  const brancherFiltres = (figures: HTMLElement[]) => {
+    const boutons = [...document.querySelectorAll<HTMLButtonElement>('.js-filtres [data-filtre]')];
+    if (!boutons.length) return;
+    const appliquer = (clé: string, parUtilisateur: boolean) => {
+      boutons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filtre === clé)));
+      let rang = 0;
+      for (const f of figures) {
+        f.hidden = clé !== '' && f.dataset.groupe !== clé;
+        if (!f.hidden && parUtilisateur) relancerApparition(f, rang++);
+      }
+      if (parUtilisateur) {
+        écrireFiltre(clé);
+        annoncer(figures.filter((f) => !f.hidden).length);
+      }
+    };
+    boutons.forEach((b) => b.addEventListener('click', () => appliquer(b.dataset.filtre ?? '', true)));
+    appliquer(lireFiltre(boutons.map((b) => b.dataset.filtre ?? '')), false);
+  };
+
+  // « Titre · 3 / 12 » : la position se compte parmi les photos que le filtre laisse voir.
+  const écrireLégende = (boîte: HTMLDialogElement, légende: string | undefined, rang: { position: number; total: number }) => {
+    boîte.querySelector<HTMLElement>('.js-legende')!.textContent = texteLégende(boîte.dataset.legende, légende, rang);
+  };
+
+  // Les indices des photos que le filtre laisse voir : la visionneuse ne parcourt qu'elles.
+  const photosVisibles = (figures: HTMLElement[]) => {
+    const visibles = () => figures.map((_, i) => i).filter((i) => !figures[i].hidden);
+    const voisine = (depuis: number, pas: number) => {
+      const liste = visibles();
+      return liste[(liste.indexOf(depuis) + pas + liste.length) % liste.length];
+    };
+    // Le rang d'une photo parmi les visibles, pour la légende.
+    const rang = (i: number) => ({ position: visibles().indexOf(i) + 1, total: visibles().length });
+    return { voisine, rang };
+  };
+
   document.addEventListener('astro:page-load', () => {
     const boîte = document.querySelector<HTMLDialogElement>('dialog.js-visionneuse');
     if (!boîte) return;
     const vignettes = [...document.querySelectorAll<HTMLButtonElement>('.js-vignette')];
-    const légende = boîte.querySelector<HTMLElement>('.js-legende')!;
+    const figures = vignettes.map((v) => v.closest('figure')!);
+    const { voisine, rang } = photosVisibles(figures);
     const économe = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
     let position = 0;
     let retour: HTMLElement | null = null;
-
     const charger = chargeur(vignettes);
-
     const afficher = afficheur(boîte);
 
     const montrer = () => {
@@ -199,7 +308,7 @@ const tuiles = await Promise.all(
       const vignette = v.querySelector('img');
       const alt = vignette?.alt ?? '';
       const ratio = Number(v.dataset.ratio) || 0;
-      légende.textContent = texteLégende(boîte.dataset.legende, v.dataset.legende, { position: i + 1, total: vignettes.length });
+      écrireLégende(boîte, v.dataset.legende, rang(i));
       // D'abord la vignette déjà chargée, agrandie : la photo est là tout de
       // suite, et se précise quand la grande arrive.
       if (vignette?.currentSrc) {
@@ -214,10 +323,10 @@ const tuiles = await Promise.all(
         // Photo introuvable : la vignette agrandie reste à l'écran, il n'y a rien d'autre à montrer.
         .catch(() => {});
       // Les voisines sont un préchargement : qu'il échoue ne regarde personne.
-      if (!économe) for (const pas of [1, -1]) charger((i + pas + vignettes.length) % vignettes.length, 'low').catch(() => {});
+      if (!économe) for (const pas of [1, -1]) charger(voisine(position, pas), 'low').catch(() => {});
     };
     const avancer = (pas: number) => {
-      position = (position + pas + vignettes.length) % vignettes.length;
+      position = voisine(position, pas);
       montrer();
     };
 
@@ -232,7 +341,7 @@ const tuiles = await Promise.all(
     );
     brancherCommandes(boîte, avancer);
     boîte.addEventListener('close', () => retour?.focus());
-
     balayer(boîte, avancer);
+    brancherFiltres(figures);
   });
 </script>
