@@ -21,7 +21,7 @@ const r = c.reglages;
 const imageOg = r.og_image ?? fond?.image ?? null;
 const accueil = new URL('/', Astro.site).toString();
 const jsonLd = [
-  siteWeb({ nom: r.site_title, url: accueil }),
+  siteWeb({ nom: r.site_title, url: accueil, nomAlternatif: T.nomCourtSite }),
   organisation({
     nom: r.site_title,
     url: accueil,

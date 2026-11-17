@@ -137,10 +137,20 @@ const sansVides = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => 
 
 /**
  * Le site : c'est lui qui donne son nom au site dans les résultats de Google.
- * @param {{ nom: string, url: string }} o
+ * `nomAlternatif` est le nom court que les gens tapent, pour que Google
+ * reconnaisse le site même sur « Cliffhanger » seul.
+ * @param {{ nom: string, url: string, nomAlternatif?: string|null }} o
  */
-export function siteWeb({ nom, url }) {
-  return { '@type': 'WebSite', '@id': `${url}#site`, name: nom, url, inLanguage: 'fr-BE', publisher: { '@id': idCompagnie(url) } };
+export function siteWeb({ nom, url, nomAlternatif = null }) {
+  return sansVides({
+    '@type': 'WebSite',
+    '@id': `${url}#site`,
+    name: nom,
+    alternateName: nomAlternatif,
+    url,
+    inLanguage: 'fr-BE',
+    publisher: { '@id': idCompagnie(url) },
+  });
 }
 
 /**

@@ -18,6 +18,7 @@ export const T = {
   // Moins de 155 caractères, où il coupe.
   // Ce que le titre de l'accueil ajoute au nom : ce qu'on cherche pour la trouver.
   titreAccueil: 'Théâtre à Bruxelles',
+  nomCourtSite: 'Cliffhanger',
   descriptionParDéfaut: 'La Compagnie Cliffhanger, compagnie de théâtre bruxelloise : ses spectacles, ses prochaines dates, son équipe.',
   /**
    * @param {string} titres
