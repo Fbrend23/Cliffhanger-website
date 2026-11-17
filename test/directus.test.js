@@ -143,15 +143,53 @@ test('dimensionsFichier : celles du CMS, sinon lues sur l’original, sinon null
   assert.deepEqual(await D.dimensionsFichier({ id: 'lu', width: null, height: null }, cache), { width: 40, height: 20 });
 });
 
+test('le jeton part à Directus', async () => {
+  jouer({ corps: { data: 1 } });
+  await D.request('/items/x');
+  assert.deepEqual(autorisations, ['Bearer faux']);
+});
+
+/**
+ * Un second serveur, d'une autre origine que le faux Directus : l'affiche de Prodysos.
+ * Rend ses réponses jouées, les en-têtes Authorization reçus, et de quoi l'arrêter.
+ * @param {{ statut?: number, corps: string | Buffer }[]} réponses
+ */
+async function serveurTiers(réponses) {
+  const reçus = [];
+  const s = http.createServer((req, res) => {
+    reçus.push(req.headers.authorization);
+    const r = réponses.shift() ?? { statut: 500, corps: 'épuisé' };
+    res.writeHead(r.statut ?? 200, { 'Content-Type': 'image/jpeg' });
+    res.end(r.corps);
+  });
+  await new Promise((ok) => s.listen(0, '127.0.0.1', ok));
+  return { url: `http://127.0.0.1:${s.address().port}`, reçus, arrêter: () => new Promise((ok) => s.close(ok)) };
+}
+
 test('assurerFichierExterne : rejoue un 5xx comme Directus, sans lui envoyer le jeton du CMS', async () => {
   const cache = await D.ouvrirCache(pathToFileURL(racine + path.sep));
   const image = await sharp({ create: { width: 30, height: 20, channels: 3, background: '#444' } }).jpeg().toBuffer();
-  jouer({ statut: 502, corps: 'passerelle' }, { corps: image, entêtes: { 'Content-Type': 'image/jpeg' } });
-  const logger = { info() {} };
-  const rendu = await D.assurerFichierExterne('http://127.0.0.1:' + serveur.address().port + '/affiche.jpg?v=1', 'affiche-test', { cache, logger });
-  assert.equal(demandes.length, 2, 'un essai, un rejeu');
-  assert.deepEqual(autorisations, [undefined, undefined], 'jamais le jeton du CMS chez un tiers');
-  assert.deepEqual(rendu, { chemin: './affiche-test.jpg', width: 30, height: 20 });
+  const tiers = await serveurTiers([{ statut: 502, corps: 'passerelle' }, { corps: image }]);
+  try {
+    const rendu = await D.assurerFichierExterne(`${tiers.url}/affiche.jpg?v=1`, 'affiche-test', { cache, logger: { info() {} } });
+    assert.deepEqual(tiers.reçus, [undefined, undefined], 'un essai, un rejeu, jamais le jeton du CMS chez un tiers');
+    assert.deepEqual(rendu, { chemin: './affiche-test.jpg', width: 30, height: 20 });
+  } finally {
+    await tiers.arrêter();
+  }
+});
+
+test('assurerFichierExterne : l’erreur nomme la source externe, pas le CMS', async () => {
+  const cache = await D.ouvrirCache(pathToFileURL(racine + path.sep));
+  const tiers = await serveurTiers([{ statut: 404, corps: 'absente' }]);
+  try {
+    await assert.rejects(
+      D.assurerFichierExterne(`${tiers.url}/absente.jpg?v=1`, 'affiche-absente', { cache, logger: { info() {} } }),
+      (erreur) => /^Source externe http:\/\/127\.0\.0\.1:\d+\/absente\.jpg\?v=1 : HTTP 404/.test(erreur.message) && !/CMS/.test(erreur.message)
+    );
+  } finally {
+    await tiers.arrêter();
+  }
 });
 
 test('pointFocal : pixels en pourcentages, borné, null sans point ni dimensions', () => {
