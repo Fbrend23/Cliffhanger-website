@@ -60,6 +60,12 @@ test('le site, la compagnie et ses représentations partagent un identifiant', (
   assert.equal(e.performer['@id'], o['@id']);
 });
 
+test('siteWeb : le nom court est dit, et omis quand il manque', () => {
+  const url = 'https://exemple.test/';
+  assert.equal(siteWeb({ nom: 'Compagnie Cliffhanger', url, nomAlternatif: 'Cliffhanger' }).alternateName, 'Cliffhanger');
+  assert.equal('alternateName' in siteWeb({ nom: 'Compagnie Cliffhanger', url }), false);
+});
+
 test('extrait : le texte seul, entier s’il est court', () => {
   assert.equal(extrait('<p>Comédienne &amp; metteuse en scène.</p><p>Née à Liège.</p>'), 'Comédienne & metteuse en scène. Née à Liège.');
   assert.equal(extrait('<p>Un&nbsp;texte<br>sur deux lignes&#39;</p>'), "Un texte sur deux lignes'");
