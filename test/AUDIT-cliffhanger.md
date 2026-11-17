@@ -15,7 +15,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [x] `.gitignore` : `.env`, `node_modules`, `dist` · et `.cache/`, `public/media/`, `/private`
 - [~] Branches `dev` / `main` (ou gitflow), `main` protégée si équipe · `dev`/`main` en place ; protection de `main` non vérifiable depuis le dépôt (seul développeur, fast-forward direct)
 - [~] Commits conventionnels, corps = pourquoi · `type: Phrase` suivi sur la quasi-totalité de l'historique (26 messages sur 196 hors format)
-- [x] `.editorconfig`, Prettier, ESLint, scripts `lint` et `format` · `.editorconfig`, `.prettierrc`, `eslint.config.js`, scripts `lint` et `format` ; Prettier non appliqué au dépôt (69 fichiers), ESLint : 0 erreur, 37 avertissements de complexité existants
+- [x] `.editorconfig`, Prettier, ESLint, scripts `lint` et `format` · `.editorconfig`, `.prettierrc`, `eslint.config.js`, scripts `lint` et `format` ; Prettier non appliqué au dépôt (69 fichiers), ESLint : 0 erreur, complexité, imbrication, paramètres et longueur de fonction en erreur
 - [x] Fichier de contexte IA (modèle : `templates/AGENTS.md`) · `CLAUDE.md`
 
 ## 3. Config et secrets (03)
@@ -131,4 +131,4 @@ Les cases cochées le 23.10 n'ont pas été revérifiées sur les ajouts du 24.1
 ## Reste à faire
 1. **Hors dépôt** : Search Console ; Sentry ; moniteur de disponibilité ; statistiques sans cookies ; protection de `main`.
 2. **Après déploiement** : securityheaders, Observatory, Lighthouse, axe, lecteur d'écran, ZAP ; `/.deploy-manifest.json` et `/.well-known/security.txt` en ligne (404 puis 200).
-3. **Avec décision** : Playwright (écarté pour l'instant : contenu du CMS instable) ; captcha sur la réservation (le piège suffit-il ?) ; formater le dépôt avec Prettier ; ramener les 37 avertissements de complexité à zéro, puis passer ces règles en `error` ; favicon SVG (pas de logo vectoriel) ; retour arrière à essayer pour de bon ; knip et jscpd.
+3. **Avec décision** : Playwright (écarté pour l'instant : contenu du CMS instable) ; captcha sur la réservation (le piège suffit-il ?) ; formater le dépôt avec Prettier ; retour arrière à essayer pour de bon.
