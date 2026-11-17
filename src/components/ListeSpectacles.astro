@@ -17,7 +17,7 @@ const { spectacles, annee = false } = Astro.props;
   {spectacles.map((s) => (
     <li class={annee ? 'my-2 tactile:my-3' : 'my-[.7rem] tactile:my-3'} data-cascade>
       <a
-        class="titre relative inline-block text-titre tactile:after:absolute tactile:after:-inset-y-1.5 tactile:after:inset-x-0 leading-none opacity-75 [transition:opacity_.25s_linear,filter_.25s_linear] group-has-[a:focus-visible]:not-focus-visible:blur-[.125rem] group-has-[a:hover]:not-hover:blur-[.125rem] hover:opacity-100 focus-visible:opacity-100 data-en-cours:opacity-100"
+        class="titre relative inline-block text-titre tactile:after:absolute tactile:after:-inset-y-1.5 tactile:after:inset-x-0 leading-none opacity-85 [transition:opacity_.25s_linear,filter_.25s_linear] group-has-[a:focus-visible]:not-focus-visible:blur-[.125rem] group-has-[a:hover]:not-hover:blur-[.125rem] hover:opacity-100 focus-visible:opacity-100 data-en-cours:opacity-100"
         href={`/spectacle/${s.slug}/`}
         data-bg={s.slug}
         translate="no"
