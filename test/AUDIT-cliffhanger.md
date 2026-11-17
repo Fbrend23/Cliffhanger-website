@@ -133,5 +133,5 @@ En-têtes inchangés (HSTS, CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`
 
 ## Reste à faire
 1. **Hors dépôt** : Search Console ; Sentry ; moniteur de disponibilité ; statistiques sans cookies ; protection de `main`.
-2. **En ligne** : securityheaders.com, lecteur d'écran, ZAP ; comprendre l'échec de Lighthouse sur `robots.txt` (PageSpeed Insights) ; Lighthouse sur les autres gabarits.
+2. **En ligne** : securityheaders.com, lecteur d'écran, ZAP ; confirmer avec PageSpeed Insights que l'échec de Lighthouse sur `robots.txt` est intermittent ; remesurer la galerie et la fiche spectacle en production après déploiement.
 3. **Avec décision** : Playwright (écarté pour l'instant : contenu du CMS instable) ; captcha sur la réservation (le piège suffit-il ?) ; formater le dépôt avec Prettier ; retour arrière à essayer pour de bon.
