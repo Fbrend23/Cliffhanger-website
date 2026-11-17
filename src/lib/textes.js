@@ -210,6 +210,12 @@ export const T = {
    */
   agrandir: (légende) => `Agrandir la photo : ${légende}`,
   photoAgrandie: 'Photo agrandie',
+  filtrerGalerie: 'Filtrer par spectacle',
+  toutesLesPhotos: 'Tout',
+  /**
+   * @param {number} n
+   */
+  nombrePhotos: (n) => (n === 1 ? '1 photo' : `${n} photos`),
   // La légende de la visionneuse : « Coulisses · 3 / 9 ».
   /**
    * @param {string} légende
