@@ -21,7 +21,7 @@ const { fond, titre, chapeau } = Astro.props;
   <Fond fond={fond} ton="voile" />
   <div class="grid justify-items-center gap-5">
     <TitrePage texte={titre} />
-    <p class="text-xl opacity-75 [--o:.75]" data-cascade set:html={tx(chapeau)} />
+    <p class="text-xl opacity-85 [--o:.85]" data-cascade set:html={tx(chapeau)} />
     <slot />
   </div>
   <Footer epingle />
