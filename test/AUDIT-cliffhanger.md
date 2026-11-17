@@ -30,7 +30,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [~] Aucune sortie HTML brute non maîtrisée, JSON-LD et `<script>` échappés · JSON-LD échappé (`<` → `<`, `Base.astro`) et `typographier()` à l'affichage ; `set:html` sur le HTML du CMS (`TexteRiche`) et `head_verification` rendus tels quels : source de confiance (Studio), non assainie
 - [~] URLs externes et redirections filtrées · aucune redirection applicative ; liens du CMS non filtrés
 - [x] En-têtes de sécurité, CSP présente ou absence justifiée par écrit · `nosniff`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options`, CSP `frame-ancestors/base-uri/object-src` ; pas de `script-src`, justifié dans `.htaccess` ; HSTS posé par l'hébergeur
-- [ ] securityheaders.com et observatory.mozilla.org sans alerte · à passer en ligne
+- [~] securityheaders.com et observatory.mozilla.org sans alerte · Observatory le 17.11.2026 : B, 75/100, 10 tests sur 12 ; perdu : CSP sans `script-src` (−20, choix justifié dans `.htaccess`) et pas de SRI sur le script externe (−5, GoatCounter) ; CORP absent sans effet sur la note. securityheaders.com pas passé
 
 ## 5. Attaques extérieures (05)
 - [x] Limitation de débit (login, contact, réinitialisation), IP lue correctement · sans objet : ni login ni formulaire de contact ; la réservation est validée et limitée côté Prodysos
@@ -69,7 +69,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [x] Polices auto-hébergées, préchargées, police de secours ajustée (`size-adjust`) · `woff2` préchargées, `font-display: swap`, polices de secours ajustées (`size-adjust`, `site.css`)
 - [x] `Cache-Control` par type de ressource, compression · `.htaccess` (immutable un an, une semaine, `no-cache` pour le HTML) ; compression laissée à l'hébergeur, non vérifiée
 - [x] Pas de JS inutile, `console.*` retirés · aucun framework client ; un seul `console.warn` (build, `prodysos.js`)
-- [ ] Lighthouse mobile au vert, Core Web Vitals corrects · mesures locales du premier affichage seulement (1820 → 664 ms) ; aucun rapport Lighthouse
+- [x] Lighthouse mobile au vert, Core Web Vitals corrects · 17.11.2026, accueil en production (Lighthouse 12.6.1, mobile) : performance 94, accessibilité 100, bonnes pratiques 100 ; LCP 2,3 s, FCP 2,3 s, TBT 0 ms, CLS 0, Speed Index 3,7 s. Accueil seulement, mesure de laboratoire (pas de données de terrain)
 
 ## 10. Accessibilité (10)
 - [x] `lang`, un seul `<h1>`, lien d'évitement · `lang="fr"`, `h1` par page (test `dist`), lien vers `#contenu`
@@ -94,7 +94,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [x] Un seul domaine canonique en HTTPS · `.htaccess` et `SITE_URL`
 - [x] Pack de favicons complet (ico, svg, apple-touch-icon, manifeste) · `favicon.ico`, `favicon.png`, `apple-touch-icon.png`, `icone-192.png`, `icone-384.png` et `site.webmanifest`, déclarés dans `Base.astro` ; pas de SVG, le logo n'existe qu'en raster (décision du 30.10.2026)
 - [ ] Search Console vérifié, sitemap envoyé · champ `head_verification` prévu dans les réglages ; état à confirmer
-- [ ] Lighthouse SEO à 100 · non mesuré
+- [ ] Lighthouse SEO à 100 · 17.11.2026 : 92 sur l'accueil, répété deux fois. Seul audit en échec : `robots.txt` « impossible à télécharger », alors que le fichier répond 200 en `text/plain` (498 octets, aussi avec un User-Agent de navigateur headless). Cause non établie : site ou poste de mesure, à recouper avec PageSpeed Insights
 
 ## 12. Mise en production et suivi (12)
 - [~] Domaine, DNS, HTTPS valides, TTL DNS baissé 48 h avant la bascule · domaine en dur dans `.htaccess` et HTTPS forcé ; DNS et TTL hors dépôt
@@ -128,7 +128,10 @@ En-têtes : CSP (`frame-ancestors 'none'; base-uri 'self'; object-src 'none'`), 
 Fichiers : `security.txt` (échéance 2027-10-28), `favicon.ico`, `site.webmanifest`, `robots.txt`, sitemap, pages légales en 200.
 Les cases cochées le 23.10 n'ont pas été revérifiées sur les ajouts du 24.10 (réseaux sociaux, fil d'Ariane, GoatCounter, retour arrière).
 
+## Vérifié en ligne le 17.11.2026 (curl, Observatory, Lighthouse, lecture seule)
+En-têtes inchangés (HSTS, CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`). `/.well-known/security.txt` en 200, `/.deploy-manifest.json` en 404, `/.env` et `/.git/config` en 403, `robots.txt` et `sitemap-index.xml` en 200, http et www en 301 vers le domaine unique. Observatory B (75), Lighthouse mobile 94 / 100 / 100 / 92 (voir les cases concernées).
+
 ## Reste à faire
 1. **Hors dépôt** : Search Console ; Sentry ; moniteur de disponibilité ; statistiques sans cookies ; protection de `main`.
-2. **Après déploiement** : securityheaders, Observatory, Lighthouse, axe, lecteur d'écran, ZAP ; `/.deploy-manifest.json` et `/.well-known/security.txt` en ligne (404 puis 200).
+2. **En ligne** : securityheaders.com, lecteur d'écran, ZAP ; comprendre l'échec de Lighthouse sur `robots.txt` (PageSpeed Insights) ; Lighthouse sur les autres gabarits.
 3. **Avec décision** : Playwright (écarté pour l'instant : contenu du CMS instable) ; captcha sur la réservation (le piège suffit-il ?) ; formater le dépôt avec Prettier ; retour arrière à essayer pour de bon.
