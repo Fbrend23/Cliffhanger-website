@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "test": "node --test test/*.test.js",
     "test:dist": "node --test test/site-construit.mjs",
+    "audit:prod": "node scripts/audit.mjs",
     "knip": "knip",
     "dupli": "jscpd"
   },
