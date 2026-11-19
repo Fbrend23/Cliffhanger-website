@@ -98,8 +98,10 @@ const QUALITÉ_PLEIN_ÉCRAN = 84;
 
 // Les photos plein écran sont aussi servies en AVIF, WebP en repli : c'est le
 // premier téléchargement de presque chaque page, et l'AVIF y pèse nettement
-// moins à qualité vue égale. Seulement elles : sur les affiches et les
-// vignettes, le gain fond et l'encodage AVIF, lent, allongerait le build.
+// moins à qualité vue égale. Avec elles, les vignettes de la galerie : en haut
+// de page, l'une d'elles est le LCP (109 Ko en WebP pour la 2e, mesuré en
+// production). Pas les affiches : le gain y fond et l'encodage AVIF, lent,
+// allongerait le build.
 // L'échelle de qualité n'est pas celle du WebP. Mesuré sur trois originaux du
 // site (dont la photo sombre de l'accueil) en 960, 1440 et 2880 px, par
 // l'écart à l'original (PSNR, image entière et ombres) : 60 égale ou dépasse
@@ -193,7 +195,8 @@ export const diapo = (image, taille) => réactive(image, taille, { largeurs: [70
  */
 export async function vignetteGalerie(image, taille, apercu = null) {
   const vignette = await réactive(image, taille, {
-    largeurs: [480, 800, 1200],
+    largeurs: [480, 720, 960, 1200],
+    avif: true,
     sizes: '(max-width: 39em) calc(100vw - 2rem), (max-width: 60em) calc(50vw - 1.5rem), (max-width: 104em) calc(100vw / 3 - 2rem), 31.5rem',
   });
   vignette.apercu = apercu;
