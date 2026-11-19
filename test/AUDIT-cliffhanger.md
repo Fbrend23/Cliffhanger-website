@@ -100,7 +100,7 @@ Légende : `[x]` fait · `[~]` partiel · `[ ]` à faire. Une case reste vide qu
 - [~] Domaine, DNS, HTTPS valides, TTL DNS baissé 48 h avant la bascule · domaine en dur dans `.htaccess` et HTTPS forcé ; DNS et TTL hors dépôt
 - [ ] Secrets de production distincts, renouvelés · `GITHUB_DEPLOY_TOKEN` régénéré le 23.10.2026 et vérifié (run `workflow_dispatch` en succès) ; les autres secrets pas renouvelés
 - [x] Mentions légales et politique de confidentialité, cookies conformes ou absents · pages `/mentions-legales/` et `/confidentialite/` en 200 (28.10.2026), aucun `Set-Cookie`, GoatCounter sans cookie comme seul traceur
-- [ ] Sentry actif, moniteur de disponibilité (alerte d'expiration SSL), statistiques sans cookies · aucun des trois dans le dépôt
+- [~] Sentry actif, moniteur de disponibilité (alerte d'expiration SSL), statistiques sans cookies · statistiques sans cookies en place (GoatCounter, `Base.astro`) ; ni Sentry ni moniteur de disponibilité
 - [ ] Parcours critiques testés sur la production · à faire (ne jamais envoyer la réservation sur le vrai Prodysos)
 - [x] `.env`, `.git`, `/api/` en 404 sur la production · vérifié le 28.10.2026 : `/.env`, `/.git/config` et `/.htaccess` en 403, `/api/`, `/.deploy-manifest.json` et le marqueur de cible en 404 : rien d'exposé
 - [x] Dependabot actif, `npm audit` mensuel · Dependabot hebdomadaire sur `dev`, `npm audit` à chaque vérification
@@ -131,7 +131,10 @@ Les cases cochées le 23.10 n'ont pas été revérifiées sur les ajouts du 24.1
 ## Vérifié en ligne le 17.11.2026 (curl, Observatory, Lighthouse, lecture seule)
 En-têtes inchangés (HSTS, CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`). `/.well-known/security.txt` en 200, `/.deploy-manifest.json` en 404, `/.env` et `/.git/config` en 403, `robots.txt` et `sitemap-index.xml` en 200, http et www en 301 vers le domaine unique. Observatory B (75), Lighthouse mobile 94 / 100 / 100 / 92 (voir les cases concernées).
 
+## Vérifié en ligne le 19.11.2026 (curl, lecture seule)
+La vidéo du menu (`/media/menu.<empreinte>.mp4`) répond 200 avec `X-Robots-Tag: noindex, noai, noimageai` : le correctif de la PR #19 est déployé. En-têtes de sécurité et `sitemap-index.xml` inchangés, www en 301. Protection de `main` : absente (« Branch not protected »).
+
 ## Reste à faire
-1. **Hors dépôt** : Search Console ; Sentry ; moniteur de disponibilité ; statistiques sans cookies ; protection de `main`.
+1. **Hors dépôt** : Search Console ; Sentry ; moniteur de disponibilité ; protection de `main`.
 2. **En ligne** : securityheaders.com, lecteur d'écran, ZAP ; confirmer avec PageSpeed Insights que l'échec de Lighthouse sur `robots.txt` est intermittent ; remesurer la galerie et la fiche spectacle en production après déploiement.
 3. **Avec décision** : Playwright (écarté pour l'instant : contenu du CMS instable) ; captcha sur la réservation (le piège suffit-il ?) ; formater le dépôt avec Prettier ; retour arrière à essayer pour de bon.

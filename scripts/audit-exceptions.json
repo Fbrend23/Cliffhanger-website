@@ -1,6 +1,1 @@
-{
-  "GHSA-FC5Q-39XC-VJPF": {
-    "jusquAu": "2026-12-17",
-    "pourquoi": "picomatch <= 4.0.7 (ReDoS), aucune version corrigée publiée le 2026-11-18. Outil de construction seulement : le site en ligne est du HTML statique, sans cette bibliothèque. Retirer dès qu'un picomatch corrigé sort (npm update picomatch)."
-  }
-}
+{}
